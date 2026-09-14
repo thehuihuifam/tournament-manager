@@ -1,0 +1,239 @@
+@import "tailwindcss";
+
+/* ===== 기본 타이포·배경 (원본과 동일) ===== */
+:root {
+  font-family: "Noto Sans KR", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: #f6f9ff;
+  font-family: "Noto Sans KR", system-ui, -apple-system, sans-serif;
+}
+
+/* ===== 애니메이션·장식 (원본과 동일) ===== */
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(-20vh) rotate(0);
+  }
+  to {
+    opacity: 0.9;
+    transform: translateY(110vh) rotate(720deg);
+  }
+}
+
+.confetti-piece {
+  border-radius: 2px;
+  width: 10px;
+  height: 16px;
+  animation-name: confetti-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  position: absolute;
+  top: -10vh;
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  70% {
+    transform: scale(1.04);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pop-in {
+  animation: 0.4s cubic-bezier(0.22, 1, 0.36, 1) both pop-in;
+}
+
+@keyframes pulse-ring {
+  0%,
+  to {
+    box-shadow: 0 0 #facc1599;
+  }
+  50% {
+    box-shadow: 0 0 0 6px #facc1500;
+  }
+}
+
+.live-match {
+  animation: 1.8s ease-in-out infinite pulse-ring;
+}
+
+.scroll-thin::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: #c7d6f5;
+  border-radius: 99px;
+}
+
+/* ===== 가독성 향상 패치 v1.0 (베이스라인 편입) ===== */
+/* I-1. 다크모드 강제 반전 방지 + 한글 기본 행간 */
+:root {
+  color-scheme: light;
+}
+
+body {
+  line-height: 1.7;
+  letter-spacing: -0.01em;
+}
+
+::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+/* I-2. 대비율 FAIL 색상 전역 교정 */
+.text-slate-300 {
+  color: #64748b;
+}
+
+.text-slate-400 {
+  color: #64748b;
+}
+
+.decoration-slate-300 {
+  text-decoration-color: #94a3b8;
+}
+
+.text-amber-500 {
+  color: #b45309;
+}
+
+/* I-3. 최소 글자 13px + 숫자 정렬 */
+.text-xs {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+table td,
+table th,
+[class*="rounded-full"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* I-4. CTA 그라데이션 끝단 교정 */
+.to-sky-500 {
+  --tw-gradient-to: #2563eb;
+}
+
+/* I-5. 브래킷: 연결선·구분선 강화 + 패자 취소선 시인성 */
+#bracket-root div.h-px {
+  background-color: #94a3b8;
+}
+
+#bracket-root div.w-6.h-px {
+  height: 2px;
+}
+
+#bracket-root .line-through {
+  color: #64748b;
+  text-decoration-thickness: 1.5px;
+}
+
+#bracket-root .text-sm.font-black {
+  font-size: 1rem;
+}
+
+/* I-6. 결과 테이블: 지브라·호버·고정 헤더·승자 악센트 */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: #f1f5f9;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #f8fafc;
+}
+
+tbody tr:hover {
+  background-color: #eff6ff;
+}
+
+tbody td:nth-child(3) {
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+/* I-7. 대형 브래킷 라운드 헤더 고정 */
+#bracket-root > div > div:first-child {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: #ffffff;
+  padding-bottom: 0.5rem;
+}
+
+/* I-8. 키보드 포커스 가시화 */
+:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* I-9. 큰 글자 모드 */
+html.big-text {
+  font-size: 18px;
+}
+
+html.big-text body {
+  line-height: 1.8;
+}
+
+html.big-text #bracket-root button[class*="w-[210px]"],
+html.big-text #bracket-root div[class*="w-[210px]"] {
+  width: 252px;
+}
+
+/* I-10. 모션 민감 대응 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+  }
+
+  .confetti-piece {
+    display: none;
+  }
+}
+
+/* I-11. 인쇄 최적화 */
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  * {
+    box-shadow: none;
+    text-shadow: none;
+    animation: none;
+  }
+
+  #root button {
+    break-inside: avoid;
+  }
+
+  .overflow-x-auto {
+    overflow: visible;
+  }
+}
