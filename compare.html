@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>가독성 패치 전/후 비교</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body {
+        font-family: "Noto Sans KR", system-ui, -apple-system, sans-serif;
+        background: #0f172a; color: #e2e8f0;
+        display: flex; flex-direction: column; height: 100vh;
+      }
+      header {
+        display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        padding: 10px 16px; background: #1e293b;
+        border-bottom: 1px solid #334155;
+      }
+      header h1 { font-size: 16px; font-weight: 900; }
+      header p { font-size: 12px; color: #94a3b8; }
+      header .links { margin-left: auto; display: flex; gap: 8px; }
+      header a {
+        font-size: 12px; font-weight: 700; color: #ffffff; text-decoration: none;
+        background: #2563eb; padding: 6px 12px; border-radius: 9999px;
+      }
+      header a.ghost { background: #334155; }
+      main { flex: 1; display: flex; min-height: 0; }
+      section { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+      section + section { border-left: 2px solid #334155; }
+      .label {
+        padding: 8px 12px; font-size: 13px; font-weight: 900;
+        display: flex; align-items: center; gap: 8px;
+      }
+      .label .badge {
+        font-size: 11px; padding: 2px 10px; border-radius: 9999px; font-weight: 900;
+      }
+      .before .label { background: #431407; color: #fdba74; }
+      .before .badge { background: #9a3412; color: #fff7ed; }
+      .after .label { background: #052e16; color: #86efac; }
+      .after .badge { background: #15803d; color: #f0fdf4; }
+      iframe { flex: 1; width: 100%; border: none; background: #ffffff; min-height: 0; }
+      footer {
+        padding: 8px 16px; font-size: 12px; color: #94a3b8; background: #1e293b;
+        border-top: 1px solid #334155;
+      }
+      @media (max-width: 900px) {
+        main { flex-direction: column; }
+        section + section { border-left: none; border-top: 2px solid #334155; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>📖 가독성 패치 전 / 후 비교</h1>
+      <p>좌 = before.html(원본) · 우 = index.html(패치 적용). 양쪽 모두 실동작 앱입니다.</p>
+      <div class="links">
+        <a href="./index.html" target="_blank">패치본 전체화면</a>
+        <a class="ghost" href="./before.html" target="_blank">원본 전체화면</a>
+      </div>
+    </header>
+    <main>
+      <section class="before">
+        <div class="label"><span class="badge">BEFORE</span> 원본 — 12px 회색 텍스트, 1px 연결선, 대비율 1.48~2.77</div>
+        <iframe title="패치 전 원본 앱" src="./before.html"></iframe>
+      </section>
+      <section class="after">
+        <div class="label"><span class="badge">AFTER</span> 패치 — 13px+ 진한 텍스트, 2px 연결선, 대비율 4.76+ · 큰 글자 토글 · PNG 고해상도 · 매치 aria-label 포함</div>
+        <iframe title="패치 후 앱" src="./index.html"></iframe>
+      </section>
+    </main>
+    <footer>비교 포인트: ① 패자 이름 취소선 판독성 ② "— 진출자 대기 —"·(번호) 진하기 ③ 결과 테이블 지브라·승자 악센트 ④ 우하단 큰 글자 모드 ON/OFF · 데이터는 localStorage 공유이므로 양쪽 상태가 연동됩니다.</footer>
+  </body>
+</html>
