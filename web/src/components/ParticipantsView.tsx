@@ -113,7 +113,7 @@ export function ParticipantsView() {
       askConfirm({
         title: '삭제할 수 없음',
         message: `"${a.name}"은(는) 대진이 생성된 종목에 진출해 있어서 삭제할 수 없습니다. 해당 종목의 대진을 초기화한 뒤 삭제하세요.`,
-        confirmLabel: '알겠습니다',
+        confirmLabel: '확인',
         onConfirm: () => {},
       });
       return;
@@ -122,6 +122,7 @@ export function ParticipantsView() {
       title: '참가자 삭제',
       message: `"${a.name}"을(를) 명단에서 삭제할까요? (더블 팀에서 함께 빠집니다)`,
       danger: true,
+      confirmLabel: '참가자 삭제',
       onConfirm: () => dispatch({ type: 'athlete/remove', id: a.id }),
     });
   };
@@ -131,7 +132,7 @@ export function ParticipantsView() {
       title: '전체 데이터 초기화',
       message: '참가자 명단, 모든 종목의 팀·대진·결과를 모두 삭제합니다. 되돌릴 수 없습니다.',
       danger: true,
-      confirmLabel: '모두 삭제',
+      confirmLabel: '모든 데이터 삭제',
       onConfirm: () => dispatch({ type: 'reset/all' }),
     });
 

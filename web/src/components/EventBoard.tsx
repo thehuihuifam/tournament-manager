@@ -56,14 +56,15 @@ function BracketSetup({ ev, teamCount }: { ev: TEvent; teamCount: number }) {
   const byes = size - teamCount;
 
   const generate = () => {
+    const isRegenerate = ev.matches !== null;
     const msg =
-      ev.matches === null
+      !isRegenerate
         ? `팀 ${teamCount}개로 대진표를 만들까요?${byes > 0 ? ` 부전승(BYE) ${byes}개가 자동 배치됩니다.` : ''}`
         : `다시 생성하면 기존 진행·결과가 사라집니다. 계속할까요?`;
     askConfirm({
-      title: '대진표 생성',
+      title: isRegenerate ? '대진표 다시 만들기' : '대진표 만들기',
       message: msg,
-      confirmLabel: '대진표 생성',
+      confirmLabel: isRegenerate ? '대진표 다시 만들기' : '대진표 만들기',
       onConfirm: () => dispatch({ type: 'event/generate', id: ev.id }),
     });
   };
@@ -104,7 +105,7 @@ function BracketSetup({ ev, teamCount }: { ev: TEvent; teamCount: number }) {
           </div>
         </div>
         <button className="btn primary big" onClick={generate}>
-          {ev.matches === null ? '🚩 대진표 생성' : '↻ 대진표 다시 생성'}
+          {ev.matches === null ? '🚩 대진표 만들기' : '↻ 대진표 다시 만들기'}
         </button>
       </div>
     </div>
@@ -172,7 +173,7 @@ export function EventBoard() {
                     title: '대진표 초기화',
                     message: `“${preset.name}”의 대진표와 모든 결과를 삭제합니다. 팀 구성은 유지됩니다.`,
                     danger: true,
-                    confirmLabel: '초기화',
+                    confirmLabel: '대진표 초기화',
                     onConfirm: () => dispatch({ type: 'event/reset', id: ev.id }),
                   })
                 }
@@ -230,7 +231,7 @@ export function EventBoard() {
                     message:
                       '대진표를 무작위로 다시 섞습니다. 지금까지 진행한 경기의 기록·승자·진출 결과가 모두 사라지고, 무작위 배치로 새 대진표가 만들어집니다. 계속할까요?',
                     danger: true,
-                    confirmLabel: '🎲 다시 섞기',
+                    confirmLabel: '대진 다시 섞기',
                     onConfirm: () => dispatch({ type: 'event/reseedRandom', id: ev.id }),
                   })
                 }

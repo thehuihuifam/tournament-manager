@@ -187,6 +187,7 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
                 title: '팀 목록 비우기',
                 message: '모든 팀 구성을 초기화합니다.',
                 danger: true,
+                confirmLabel: '팀 구성 비우기',
                 onConfirm: () => setTeams([]),
               });
             }}

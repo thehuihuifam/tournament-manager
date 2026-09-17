@@ -223,7 +223,7 @@ function MatchCell({
       title: '경기 결과 초기화',
       message: `이번 경기의 점수와 결과를 지웁니다. 다음 라운드부터의 진출·결과도 함께 초기화됩니다.`,
       danger: true,
-      confirmLabel: '초기화',
+      confirmLabel: '경기 결과 초기화',
       onConfirm: () => {
         dispatch({ type: 'match/setResult', id: ev.id, matchId: m.id, winner: null, clearScores: true });
         setRecordOpen(false);
