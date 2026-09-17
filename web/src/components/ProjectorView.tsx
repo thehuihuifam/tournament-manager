@@ -155,7 +155,8 @@ export function ProjectorView() {
         <div className="pj-top-actions">
           <button
             className="pj-theme"
-            aria-label="테마 전환"
+            aria-label={state.projectorTheme === 'dark' ? '라이트 테마로 전환' : '다크 테마로 전환'}
+            aria-pressed={state.projectorTheme === 'dark'}
             title={`프로젝터 테마 전환 (현재: ${
               state.projectorTheme === 'dark' ? '다크' : '라이트'
             }) · 선택한 테마는 새로고침 후에도 유지됩니다`}
@@ -163,8 +164,8 @@ export function ProjectorView() {
           >
             {projectorThemeToggleLabel(state.projectorTheme)}
           </button>
-          <button className="pj-exit" onClick={() => dispatch({ type: 'ui/projector', on: false })}>
-            ✕ 종료 <small>(ESC)</small>
+          <button className="pj-exit" onClick={() => dispatch({ type: 'ui/projector', on: false })} aria-label="편집 화면으로 돌아가기 (ESC)">
+            ✕ 편집 화면으로 돌아가기 <small>(ESC)</small>
           </button>
         </div>
       </div>

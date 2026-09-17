@@ -141,12 +141,15 @@ export function ParticipantsView() {
       <section className="panel">
         <h2 className="panel-title">✍️ 개별 등록</h2>
         <div className="add-row">
+          <label htmlFor="new-athlete-name" className="visually-hidden">참가자 이름</label>
           <input
+            id="new-athlete-name"
             className="input"
             placeholder="이름 (예: 김수연)"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addOne()}
+            aria-label="참가자 이름"
           />
           <div className="seg" role="radiogroup" aria-label="성별">
             <button
@@ -186,12 +189,14 @@ export function ParticipantsView() {
             <button
               className={cls('seg-btn', bulkMode === 'replace' && 'active')}
               onClick={() => setBulkMode('replace')}
+              aria-pressed={bulkMode === 'replace'}
             >
               덮어쓰기
             </button>
             <button
               className={cls('seg-btn', bulkMode === 'append' && 'active')}
               onClick={() => setBulkMode('append')}
+              aria-pressed={bulkMode === 'append'}
             >
               기존에 추가
             </button>
@@ -211,7 +216,7 @@ export function ParticipantsView() {
               <span className="err"> · ⚠️ {report.errors.length}개 행 오류</span>
             )}
             {report.errors.slice(0, 5).map((e) => (
-              <div key={e.line} className="import-err">
+              <div key={e.line} className="import-err" role="alert">
                 {e.line}행: “{e.text}” — {e.reason}
               </div>
             ))}
@@ -245,7 +250,7 @@ export function ParticipantsView() {
                   onChange={(e) =>
                     dispatch({ type: 'athlete/update', id: a.id, name: e.target.value })
                   }
-                  aria-label="이름"
+                  aria-label={`${a.name} 참가자 이름`}
                 />
                 <button
                   className={cls('g-badge', a.gender === 'M' ? 'g-m' : 'g-f')}
@@ -263,18 +268,19 @@ export function ParticipantsView() {
                   {a.gender === 'M' ? '🔵 남자' : '🔴 여자'}
                 </button>
                 <span className="roster-move">
-                  <button disabled={i === 0 || lockedIds.has(a.id)} onClick={() => dispatch({ type: 'athlete/move', id: a.id, dir: -1 })} title="위로">
+                  <button disabled={i === 0 || lockedIds.has(a.id)} onClick={() => dispatch({ type: 'athlete/move', id: a.id, dir: -1 })} title="위로" aria-label={`${a.name} 위로 이동`}>
                     ↑
                   </button>
                   <button
                     disabled={i === state.athletes.length - 1 || lockedIds.has(a.id)}
                     onClick={() => dispatch({ type: 'athlete/move', id: a.id, dir: 1 })}
                     title="아래로"
+                    aria-label={`${a.name} 아래로 이동`}
                   >
                     ↓
                   </button>
                 </span>
-                <button className="roster-del" onClick={() => removeAthlete(a)} title="삭제">
+                <button className="roster-del" onClick={() => removeAthlete(a)} title="삭제" aria-label={`${a.name} 명단에서 제거`}>
                   ✕
                 </button>
               </li>

@@ -312,6 +312,7 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
                           setTeams(arr);
                         }}
                         title="시드 위로"
+                        aria-label={`${t.name} 시드 위로 이동`}
                       >
                         ↑
                       </button>
@@ -323,6 +324,7 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
                           setTeams(arr);
                         }}
                         title="시드 아래로"
+                        aria-label={`${t.name} 시드 아래로 이동`}
                       >
                         ↓
                       </button>
@@ -333,6 +335,11 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
                             ? '2인 팀으로 변경 (3번째 선수는 미배정으로 돌아갑니다)'
                             : '3인 팀으로 변경 (세 번째 슬롯이 열립니다)'
                         }
+                        aria-label={
+                          slotCount === 3
+                            ? `${t.name} 2인 팀으로 변경`
+                            : `${t.name} 3인 팀으로 변경`
+                        }
                       >
                         {slotCount === 3 ? '2⇥' : '3⇥'}
                       </button>
@@ -340,6 +347,7 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
                         className="team-del"
                         onClick={() => setTeams(ev.teams.filter((x) => x.id !== t.id))}
                         title="팀 삭제"
+                        aria-label={`${t.name} 팀 삭제`}
                       >
                         ✕
                       </button>

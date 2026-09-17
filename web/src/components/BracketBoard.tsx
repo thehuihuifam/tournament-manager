@@ -52,7 +52,7 @@ function ScoreInput({
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
       }}
       onClick={(e) => e.stopPropagation()}
-      aria-label="기록"
+      aria-label={mode === 'time' ? '기록(초.밀리초)' : '세트 수'}
     />
   );
 }
