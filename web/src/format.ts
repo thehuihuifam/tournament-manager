@@ -23,8 +23,8 @@ export function parseTime(raw: string): number | null {
 
 export function parseGenderToken(s: string): 'M' | 'F' | null {
   const t = s.trim();
-  if (['남', '남자', '남성', 'M', 'm', 'male', 'MALE'].includes(t)) return 'M';
-  if (['여', '여자', '여성', 'F', 'f', 'female', 'FEMALE'].includes(t)) return 'F';
+  if (['남', '남자', '남성', '男', 'M', 'm', 'male', 'MALE'].includes(t)) return 'M';
+  if (['여', '여자', '여성', '女', 'F', 'f', 'female', 'FEMALE'].includes(t)) return 'F';
   return null;
 }
 
