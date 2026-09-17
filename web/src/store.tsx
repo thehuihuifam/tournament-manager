@@ -9,12 +9,13 @@ import {
   Team,
   TEvent,
 } from './types';
-import { PRESETS, getTeams, initialEvents, presetOf } from './presets';
+import { PRESETS, getTeams, initialEvents, presetOf, teamMap } from './presets';
 import {
   autoCurrentId,
   buildMatches,
   decideFromScores,
   propagate,
+  withValidPairings,
 } from './bracket';
 import { uid } from './format';
 
@@ -40,7 +41,9 @@ function normalizeEvents(saved: unknown): TEvent[] {
     return {
       ...b,
       ...s,
-      teams: Array.isArray(s.teams) ? s.teams : [],
+      // 2인 구형 데이터에는 pairings가 없어도 그대로 복구되고,
+      // 3인 팀의 저장된 pairings는 순서를 바꾸지 않고 그대로 복구한다.
+      teams: Array.isArray(s.teams) ? s.teams.map(withValidPairings) : [],
       excludedIds: Array.isArray(s.excludedIds) ? s.excludedIds : [],
       matches: Array.isArray(s.matches) ? s.matches : null,
     };
@@ -103,6 +106,7 @@ export type Action =
   | { type: 'event/generate'; id: string }
   | { type: 'match/score'; id: string; matchId: string; side: 'A' | 'B'; value: number | null }
   | { type: 'match/setResult'; id: string; matchId: string; winner: 'A' | 'B' | null; clearScores?: boolean }
+  | { type: 'match/pairingNext'; id: string; matchId: string; side: 'A' | 'B' }
   | { type: 'match/decide'; id: string; matchId: string }
   | { type: 'match/current'; id: string; matchId: string | null }
   | { type: 'ui/projector'; on: boolean }
@@ -123,7 +127,20 @@ function refreshCurrent(ev: TEvent): TEvent {
   return { ...ev, currentMatchId: valid ? valid.id : autoCurrentId(ev.matches) };
 }
 
-function setResult(ev: TEvent, matchId: string, winner: 'A' | 'B' | null, clearScores: boolean): TEvent {
+/** 더블 종목이면 팀 id → Team 맵 (3인 팀 출전 조합 순환 전파용). 개인전은 undefined */
+function teamLookup(state: AppState, ev: TEvent): Map<string, Team> | undefined {
+  const kind = presetOf(ev.id).kind;
+  if (kind !== 'double') return undefined;
+  return teamMap(getTeams(state.athletes, ev, kind));
+}
+
+function setResult(
+  ev: TEvent,
+  matchId: string,
+  winner: 'A' | 'B' | null,
+  clearScores: boolean,
+  teams?: Map<string, Team>,
+): TEvent {
   if (!ev.matches) return ev;
   const matches = ev.matches.map((m) =>
     m.id === matchId
@@ -135,7 +152,7 @@ function setResult(ev: TEvent, matchId: string, winner: 'A' | 'B' | null, clearS
         }
       : m,
   );
-  return refreshCurrent({ ...ev, matches: propagate(matches) });
+  return refreshCurrent({ ...ev, matches: propagate(matches, teams) });
 }
 
 function reducer(state: AppState, a: Action): AppState {
@@ -160,9 +177,10 @@ function reducer(state: AppState, a: Action): AppState {
           .filter((x) => x.id !== a.id)
           .map((x, i) => ({ ...x, no: i + 1 })),
         events: state.events.map((ev) => {
+          // 선수가 빠진 팀은 pairings를 재정규화하고, 2명 미만으로 줄어든 팀은 제거한다.
           const teams = ev.teams
-            .map((t) => ({ ...t, members: t.members.filter((m) => m !== a.id) }))
-            .filter((t) => t.members.length === 2);
+            .map((t) => withValidPairings({ ...t, members: t.members.filter((m) => m !== a.id) }))
+            .filter((t) => t.members.length === 2 || t.members.length === 3);
           return { ...ev, teams };
         }),
       };
@@ -195,7 +213,8 @@ function reducer(state: AppState, a: Action): AppState {
     case 'event/teams':
       return withEvent(state, a.id, (ev) => ({
         ...ev,
-        teams: a.teams.map((t) => ({ ...t, members: t.members.filter(Boolean) })),
+        // 빈 슬롯('')은 압축하고, 3인 팀의 pairings는 구성원 기준으로 유지/재생성한다.
+        teams: a.teams.map(withValidPairings),
       }));
     case 'event/reset':
       return withEvent(state, a.id, (ev) => ({ ...ev, matches: null, currentMatchId: null }));
@@ -217,7 +236,26 @@ function reducer(state: AppState, a: Action): AppState {
         return { ...ev, matches };
       });
     case 'match/setResult':
-      return withEvent(state, a.id, (ev) => setResult(ev, a.matchId, a.winner, !!a.clearScores));
+      return withEvent(state, a.id, (ev) =>
+        setResult(ev, a.matchId, a.winner, !!a.clearScores, teamLookup(state, ev)),
+      );
+    case 'match/pairingNext':
+      return withEvent(state, a.id, (ev) => {
+        if (!ev.matches) return ev;
+        const m = ev.matches.find((x) => x.id === a.matchId);
+        if (!m || m.decided) return ev;
+        const tid = a.side === 'A' ? m.a : m.b;
+        if (!tid) return ev;
+        const team = teamLookup(state, ev)?.get(tid);
+        if (!team?.pairings || team.pairings.length === 0) return ev;
+        const key = a.side === 'A' ? 'pairingA' : 'pairingB';
+        return {
+          ...ev,
+          matches: ev.matches.map((x) =>
+            x.id === a.matchId ? { ...x, [key]: ((x[key] ?? 0) + 1) % team.pairings!.length } : x,
+          ),
+        };
+      });
     case 'match/decide': {
       const ev = state.events.find((e) => e.id === a.id);
       if (!ev?.matches) return state;
@@ -225,7 +263,7 @@ function reducer(state: AppState, a: Action): AppState {
       if (!m) return state;
       const w = decideFromScores(m, ev.scoreMode);
       if (!w) return state;
-      return withEvent(state, a.id, (e) => setResult(e, a.matchId, w, false));
+      return withEvent(state, a.id, (e) => setResult(e, a.matchId, w, false, teamLookup(state, e)));
     }
     case 'match/current':
       return withEvent(state, a.id, (ev) => ({ ...ev, currentMatchId: a.matchId }));

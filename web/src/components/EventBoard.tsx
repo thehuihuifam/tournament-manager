@@ -144,7 +144,7 @@ export function EventBoard() {
           <div className="event-title">
             <h2>{preset.name}</h2>
             <span className={cls('badge', preset.kind === 'double' ? 'badge-d' : 'badge-i')}>
-              {preset.kind === 'individual' ? '개인전' : '더블 · 2인 1조'}
+              {preset.kind === 'individual' ? '개인전' : '더블 · 2~3인 1팀'}
             </span>
           </div>
           <div className="event-tools">

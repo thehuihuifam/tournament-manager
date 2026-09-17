@@ -5,9 +5,9 @@ export const PRESETS: EventPreset[] = [
   { id: 'ind-333', name: '3-3-3 (개인)', short: '3-3-3', kind: 'individual', desc: '개인 · 3-3-3 시퀀스' },
   { id: 'ind-363', name: '3-6-3 (개인)', short: '3-6-3', kind: 'individual', desc: '개인 · 3-6-3 시퀀스' },
   { id: 'ind-cycle', name: '사이클 (개인)', short: '사이클', kind: 'individual', desc: '개인 · 사이클' },
-  { id: 'dbl-333', name: '더블 3-3-3', short: '더블 3-3-3', kind: 'double', desc: '더블 · 2인 1조' },
-  { id: 'dbl-363', name: '더블 3-6-3', short: '더블 3-6-3', kind: 'double', desc: '더블 · 2인 1조' },
-  { id: 'dbl-cycle', name: '더블 사이클', short: '더블 사이클', kind: 'double', desc: '더블 · 2인 1조' },
+  { id: 'dbl-333', name: '더블 3-3-3', short: '더블 3-3-3', kind: 'double', desc: '더블 · 2~3인 1팀' },
+  { id: 'dbl-363', name: '더블 3-6-3', short: '더블 3-6-3', kind: 'double', desc: '더블 · 2~3인 1팀' },
+  { id: 'dbl-cycle', name: '더블 사이클', short: '더블 사이클', kind: 'double', desc: '더블 · 2~3인 1팀' },
 ];
 
 export function presetOf(id: string): EventPreset {
@@ -34,11 +34,16 @@ export function individualTeams(athletes: Athlete[], ev: TEvent): Team[] {
     .map((a) => ({ id: `ind-${a.id}`, name: a.name, members: [a.id] }));
 }
 
-/** 종목의 유효 팀 목록 (더블은 2인 완성 팀만) */
+/** 종목의 유효 팀 목록 (더블은 구성원이 2명 또는 3명인 완성 팀) */
 export function getTeams(athletes: Athlete[], ev: TEvent, kind: EventKind): Team[] {
   return kind === 'individual'
     ? individualTeams(athletes, ev)
-    : ev.teams.filter((t) => t.members.length === 2);
+    : ev.teams.filter((t) => t.members.length === 2 || t.members.length === 3);
+}
+
+/** 팀 카드에 표시할 슬롯 수 — 3인 팀이면 0·1·2번 세 슬롯, 그 외 0·1번 두 슬롯 */
+export function teamSlotCount(t: Team): 2 | 3 {
+  return t.size === 3 || t.members.length >= 3 ? 3 : 2;
 }
 
 export function roundCount(matches: Match[]): number {

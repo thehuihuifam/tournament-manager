@@ -92,6 +92,16 @@ function Slot({
       ? team.members.map((id) => state.athletes.find((a) => a.id === id)?.name ?? '??').join(' · ')
       : null;
 
+  // 3인 팀: 이 경기에 실제 출전하는 2인 조합을 표시한다.
+  const pairIdx = side === 'A' ? m.pairingA : m.pairingB;
+  const activePair =
+    team && team.pairings && team.pairings.length > 0
+      ? team.pairings[(pairIdx ?? 0) % team.pairings.length]
+      : null;
+  const pairNames = activePair
+    ? activePair.map((id) => state.athletes.find((a) => a.id === id)?.name ?? '??').join(' + ')
+    : null;
+
   const showInput = both && recordOpen;
   const selectable = both && !m.decided && !!tid;
 
@@ -122,9 +132,14 @@ function Slot({
     >
       <span className="slot-tag">{side}</span>
       {tid ? (
-        <span className="slot-name" title={memberNames ?? undefined}>
+        <span className={cls('slot-name', pairNames && 'wrap')} title={memberNames ?? undefined}>
           {team?.name ?? '—'}
           {memberNames && <small className="slot-members">{memberNames}</small>}
+          {pairNames && (
+            <small className="slot-pair-now" title="이번 경기 출전 조합">
+              ▶ {pairNames}
+            </small>
+          )}
         </span>
       ) : (
         <span className="slot-name tbd-text">{m.decided ? 'BYE' : '미정'}</span>
@@ -168,10 +183,24 @@ function MatchCell({
   isFinal: boolean;
   isCur: boolean;
 }) {
-  const { dispatch } = useStore();
+  const { state, dispatch } = useStore();
   const { askConfirm } = useConfirm();
   const [recordOpen, setRecordOpen] = useState(false);
   const both = !!(m.a && m.b);
+
+  // 3인 팀 슬롯의 현재/다음 출전 조합 정보 (2인 팀이면 null)
+  const pairInfo = (side: 'A' | 'B') => {
+    const tid = side === 'A' ? m.a : m.b;
+    const team = tid ? map.get(tid) : undefined;
+    const pairings = team?.pairings;
+    if (!pairings || pairings.length === 0) return null;
+    const idx = ((side === 'A' ? m.pairingA : m.pairingB) ?? 0) % pairings.length;
+    const nm = (id: string) => state.athletes.find((a) => a.id === id)?.name ?? '??';
+    const fmt = (i: number) => pairings[i].map(nm).join(' + ');
+    return { now: fmt(idx), next: fmt((idx + 1) % pairings.length) };
+  };
+  const piA = pairInfo('A');
+  const piB = pairInfo('B');
 
   const onScore = (side: 'A' | 'B', v: number | null) => {
     // 기록은 승자 판정과 독립적으로 저장한다.
@@ -225,6 +254,31 @@ function MatchCell({
               <button className="btn tiny" onClick={() => setRecordOpen((open) => !open)}>
                 ⏱ 기록 {recordOpen ? '닫기' : '입력'}
               </button>
+            )}
+            {!m.decided && both && piA && (
+              <button
+                className="btn tiny pair-btn"
+                title={`A측 출전 조합을 다음으로 교체 (현재: ${piA.now} → 다음: ${piA.next})`}
+                onClick={() => dispatch({ type: 'match/pairingNext', id: ev.id, matchId: m.id, side: 'A' })}
+              >
+                🔄 A 조합
+              </button>
+            )}
+            {!m.decided && both && piB && (
+              <button
+                className="btn tiny pair-btn"
+                title={`B측 출전 조합을 다음으로 교체 (현재: ${piB.now} → 다음: ${piB.next})`}
+                onClick={() => dispatch({ type: 'match/pairingNext', id: ev.id, matchId: m.id, side: 'B' })}
+              >
+                🔄 B 조합
+              </button>
+            )}
+            {!m.decided && both && (piA || piB) && (
+              <span className="pair-hint">
+                {piA && `A측 다음: ${piA.next}`}
+                {piA && piB && ' · '}
+                {piB && `B측 다음: ${piB.next}`}
+              </span>
             )}
             {!m.decided && both && <span className="win-hint">👆 이긴 쪽 이름 클릭 = 승리</span>}
             {m.decided && (

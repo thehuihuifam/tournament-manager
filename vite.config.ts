@@ -15,5 +15,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
+    // 개발 서버 전용 — LAN 데모·샌드박스 프록시 미리보기 호스트에서도 접속할 수 있도록 허용
+    allowedHosts: true,
   },
 });

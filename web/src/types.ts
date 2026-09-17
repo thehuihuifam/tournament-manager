@@ -17,11 +17,22 @@ export interface EventPreset {
   desc: string;
 }
 
+/** 3인 팀이 치르는 한 번의 매치에 실제 출전하는 2인 조합 (선수 id 2개 — A+B와 B+A는 같은 조합) */
+export type TeamPairing = [string, string];
+
 export interface Team {
   id: string;
   name: string;
-  /** 개인전: 1명, 더블: 2명 (선수 id) */
+  /** 개인전: 1명, 더블: 2명 또는 3명 (선수 id) */
   members: string[];
+  /** 더블 팀 슬롯 수 (기본 2). 3이면 세 번째 슬롯까지 표시·배정 가능 */
+  size?: 2 | 3;
+  /**
+   * 3인 더블 팀의 경기별 2인 출전 조합 — [A+B, B+C, A+C] 세 가지가 정확히 한 번씩.
+   * 배열 순서 = 경기 진행 순서. 팀 생성 시 한 번만 결정해 저장하고,
+   * 구성원이 바뀌면 폐기 후 재생성한다. 2인 팀은 생략 가능.
+   */
+  pairings?: TeamPairing[];
 }
 
 export type ScoreMode = 'time' | 'sets';
@@ -38,6 +49,9 @@ export interface Match {
   scoreB: number | null;
   winner: 'A' | 'B' | null;
   decided: boolean;
+  /** 3인 팀이 들어선 슬롯의 현재 출전 조합 인덱스 (team.pairings 기준). 2인 팀이면 생략 */
+  pairingA?: number;
+  pairingB?: number;
 }
 
 export interface TEvent {
