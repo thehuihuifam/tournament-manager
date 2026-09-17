@@ -20,6 +20,16 @@ function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string,
     t && preset.kind === 'double'
       ? t.members.map((id) => state.athletes.find((x) => x.id === id)?.name ?? '??').join(' · ')
       : null;
+  // 3인 팀: 현재 출전 조합과 다음 조합 (2인 팀이면 null)
+  const pairOf = (t: Team | undefined, idx: number | undefined, offset: 0 | 1) => {
+    if (!t || !t.pairings || t.pairings.length === 0) return null;
+    const p = t.pairings[((idx ?? 0) + offset) % t.pairings.length];
+    return p.map((id) => state.athletes.find((x) => x.id === id)?.name ?? '??').join(' + ');
+  };
+  const pairNowA = pairOf(a, cur.pairingA, 0);
+  const pairNextA = pairOf(a, cur.pairingA, 1);
+  const pairNowB = pairOf(b, cur.pairingB, 0);
+  const pairNextB = pairOf(b, cur.pairingB, 1);
   const scoreText = (s: number | null, mode: ScoreMode) =>
     s == null ? null : mode === 'time' ? formatTime(s) : `${s} 세트`;
   const scoreA = scoreText(cur.scoreA, ev.scoreMode);
@@ -38,6 +48,8 @@ function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string,
         <div className={cls('now-side', cur.winner === 'A' && 'winner', cur.winner === 'B' && 'loser')}>
           <div className="now-name">{sideName(a)}</div>
           <div className="now-members">{membersOf(a) ?? '\u00A0'}</div>
+          {pairNowA && <div className="now-pair">▶ 출전: {pairNowA}</div>}
+          {pairNextA && <div className="now-pair-next">다음 조합: {pairNextA}</div>}
           {scoreA && <div className="now-score">{scoreA}</div>}
           {cur.winner === 'A' && <div className="now-flag">🏆 승</div>}
         </div>
@@ -47,6 +59,8 @@ function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string,
         <div className={cls('now-side', cur.winner === 'B' && 'winner', cur.winner === 'A' && 'loser')}>
           <div className="now-name">{sideName(b)}</div>
           <div className="now-members">{membersOf(b) ?? '\u00A0'}</div>
+          {pairNowB && <div className="now-pair">▶ 출전: {pairNowB}</div>}
+          {pairNextB && <div className="now-pair-next">다음 조합: {pairNextB}</div>}
           {scoreB && <div className="now-score">{scoreB}</div>}
           {cur.winner === 'B' && <div className="now-flag">🏆 승</div>}
         </div>
