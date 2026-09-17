@@ -82,11 +82,11 @@ export function Header() {
         ))}
       </nav>
       <div className="header-right">
-        <span className="chip">
+        <span className="chip" aria-label={`등록 ${state.athletes.length}명, 남자 ${m}명, 여자 ${f}명`}>
           등록 <b>{state.athletes.length}</b>명
-          <i className="chip-dot" />
-          <b>🔵{m}</b>
-          <b>🔴{f}</b>
+          <i className="chip-dot" aria-hidden="true" />
+          <b aria-hidden="true">🔵{m}</b>
+          <b aria-hidden="true">🔴{f}</b>
         </span>
         <button className="proj-btn" onClick={handleExport} title="현재 대회 데이터를 JSON 파일로 내보냅니다">
           💾 내보내기

@@ -152,14 +152,16 @@ export function ParticipantsView() {
             <button
               className={cls('seg-btn', gender === 'M' && 'active')}
               onClick={() => setGender('M')}
+              aria-pressed={gender === 'M'}
             >
-              🔵 남
+              🔵 남자
             </button>
             <button
               className={cls('seg-btn', gender === 'F' && 'active')}
               onClick={() => setGender('F')}
+              aria-pressed={gender === 'F'}
             >
-              🔴 여
+              🔴 여자
             </button>
           </div>
           <button className="btn primary" onClick={addOne}>
@@ -256,8 +258,9 @@ export function ParticipantsView() {
                     })
                   }
                   title="클릭해서 성별 변경"
+                  aria-label={`${a.name} 성별 ${a.gender === 'M' ? '남자' : '여자'}, 클릭하여 변경`}
                 >
-                  {a.gender === 'M' ? '🔵 남' : '🔴 여'}
+                  {a.gender === 'M' ? '🔵 남자' : '🔴 여자'}
                 </button>
                 <span className="roster-move">
                   <button disabled={i === 0 || lockedIds.has(a.id)} onClick={() => dispatch({ type: 'athlete/move', id: a.id, dir: -1 })} title="위로">

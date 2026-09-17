@@ -141,18 +141,20 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
     <div className="builder">
       <div className="builder-controls">
         <div className="seg" role="radiogroup" aria-label="성별 필터">
-          <button className={cls('seg-btn', filter === 'all' && 'active')} onClick={() => setFilter('all')}>
+          <button className={cls('seg-btn', filter === 'all' && 'active')} onClick={() => setFilter('all')} aria-pressed={filter === 'all'}>
             전체 {athletes.length}
           </button>
           <button
             className={cls('seg-btn', filter === 'M' && 'active')}
             onClick={() => setFilter('M')}
+            aria-pressed={filter === 'M'}
           >
             🔵 남자 {athletes.filter((a) => a.gender === 'M').length}
           </button>
           <button
             className={cls('seg-btn', filter === 'F' && 'active')}
             onClick={() => setFilter('F')}
+            aria-pressed={filter === 'F'}
           >
             🔴 여자 {athletes.filter((a) => a.gender === 'F').length}
           </button>
