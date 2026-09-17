@@ -193,8 +193,8 @@ export function ParticipantsView() {
               기존에 추가
             </button>
           </div>
-          <button className="btn primary" onClick={doImport} disabled={!bulk.trim()}>
-            ⬇ 이름 가져오기
+          <button className="btn primary" onClick={doImport} disabled={!bulk.trim()} title="입력한 명단을 참가자 목록에 추가합니다" aria-label="입력한 명단을 참가자 목록에 추가합니다">
+            ✅ 명단에 추가
           </button>
         </div>
         {report && (
