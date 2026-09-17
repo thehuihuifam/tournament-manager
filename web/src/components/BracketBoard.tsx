@@ -52,7 +52,7 @@ function ScoreInput({
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
       }}
       onClick={(e) => e.stopPropagation()}
-      aria-label="기록"
+      aria-label={mode === 'time' ? '기록(초.밀리초)' : '세트 수'}
     />
   );
 }
@@ -223,7 +223,7 @@ function MatchCell({
       title: '경기 결과 초기화',
       message: `이번 경기의 점수와 결과를 지웁니다. 다음 라운드부터의 진출·결과도 함께 초기화됩니다.`,
       danger: true,
-      confirmLabel: '초기화',
+      confirmLabel: '경기 결과 초기화',
       onConfirm: () => {
         dispatch({ type: 'match/setResult', id: ev.id, matchId: m.id, winner: null, clearScores: true });
         setRecordOpen(false);
@@ -299,7 +299,7 @@ function MatchCell({
                 {piB && `B측 다음: ${piB.next}`}
               </span>
             )}
-            {!m.decided && both && <span className="win-hint">👆 이긴 쪽 이름 클릭 = 승리</span>}
+            {!m.decided && both && <span className="win-hint">힌트: 이긴 쪽 이름을 클릭하면 승리로 기록됩니다.</span>}
             {m.decided && (
               <button className="btn tiny ghost-danger" onClick={cancelResult}>
                 ↺ 결과 초기화

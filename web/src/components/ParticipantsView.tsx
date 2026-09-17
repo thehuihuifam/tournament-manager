@@ -113,7 +113,7 @@ export function ParticipantsView() {
       askConfirm({
         title: '삭제할 수 없음',
         message: `"${a.name}"은(는) 대진이 생성된 종목에 진출해 있어서 삭제할 수 없습니다. 해당 종목의 대진을 초기화한 뒤 삭제하세요.`,
-        confirmLabel: '알겠습니다',
+        confirmLabel: '확인',
         onConfirm: () => {},
       });
       return;
@@ -122,6 +122,7 @@ export function ParticipantsView() {
       title: '참가자 삭제',
       message: `"${a.name}"을(를) 명단에서 삭제할까요? (더블 팀에서 함께 빠집니다)`,
       danger: true,
+      confirmLabel: '참가자 삭제',
       onConfirm: () => dispatch({ type: 'athlete/remove', id: a.id }),
     });
   };
@@ -131,7 +132,7 @@ export function ParticipantsView() {
       title: '전체 데이터 초기화',
       message: '참가자 명단, 모든 종목의 팀·대진·결과를 모두 삭제합니다. 되돌릴 수 없습니다.',
       danger: true,
-      confirmLabel: '모두 삭제',
+      confirmLabel: '모든 데이터 삭제',
       onConfirm: () => dispatch({ type: 'reset/all' }),
     });
 
@@ -140,25 +141,30 @@ export function ParticipantsView() {
       <section className="panel">
         <h2 className="panel-title">✍️ 개별 등록</h2>
         <div className="add-row">
+          <label htmlFor="new-athlete-name" className="visually-hidden">참가자 이름</label>
           <input
+            id="new-athlete-name"
             className="input"
             placeholder="이름 (예: 김수연)"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addOne()}
+            aria-label="참가자 이름"
           />
           <div className="seg" role="radiogroup" aria-label="성별">
             <button
               className={cls('seg-btn', gender === 'M' && 'active')}
               onClick={() => setGender('M')}
+              aria-pressed={gender === 'M'}
             >
-              🔵 남
+              🔵 남자
             </button>
             <button
               className={cls('seg-btn', gender === 'F' && 'active')}
               onClick={() => setGender('F')}
+              aria-pressed={gender === 'F'}
             >
-              🔴 여
+              🔴 여자
             </button>
           </div>
           <button className="btn primary" onClick={addOne}>
@@ -183,18 +189,20 @@ export function ParticipantsView() {
             <button
               className={cls('seg-btn', bulkMode === 'replace' && 'active')}
               onClick={() => setBulkMode('replace')}
+              aria-pressed={bulkMode === 'replace'}
             >
               덮어쓰기
             </button>
             <button
               className={cls('seg-btn', bulkMode === 'append' && 'active')}
               onClick={() => setBulkMode('append')}
+              aria-pressed={bulkMode === 'append'}
             >
               기존에 추가
             </button>
           </div>
-          <button className="btn primary" onClick={doImport} disabled={!bulk.trim()}>
-            ⬇ 이름 가져오기
+          <button className="btn primary" onClick={doImport} disabled={!bulk.trim()} title="입력한 명단을 참가자 목록에 추가합니다" aria-label="입력한 명단을 참가자 목록에 추가합니다">
+            ✅ 명단에 추가
           </button>
         </div>
         {report && (
@@ -208,7 +216,7 @@ export function ParticipantsView() {
               <span className="err"> · ⚠️ {report.errors.length}개 행 오류</span>
             )}
             {report.errors.slice(0, 5).map((e) => (
-              <div key={e.line} className="import-err">
+              <div key={e.line} className="import-err" role="alert">
                 {e.line}행: “{e.text}” — {e.reason}
               </div>
             ))}
@@ -242,7 +250,7 @@ export function ParticipantsView() {
                   onChange={(e) =>
                     dispatch({ type: 'athlete/update', id: a.id, name: e.target.value })
                   }
-                  aria-label="이름"
+                  aria-label={`${a.name} 참가자 이름`}
                 />
                 <button
                   className={cls('g-badge', a.gender === 'M' ? 'g-m' : 'g-f')}
@@ -255,22 +263,24 @@ export function ParticipantsView() {
                     })
                   }
                   title="클릭해서 성별 변경"
+                  aria-label={`${a.name} 성별 ${a.gender === 'M' ? '남자' : '여자'}, 클릭하여 변경`}
                 >
-                  {a.gender === 'M' ? '🔵 남' : '🔴 여'}
+                  {a.gender === 'M' ? '🔵 남자' : '🔴 여자'}
                 </button>
                 <span className="roster-move">
-                  <button disabled={i === 0 || lockedIds.has(a.id)} onClick={() => dispatch({ type: 'athlete/move', id: a.id, dir: -1 })} title="위로">
+                  <button disabled={i === 0 || lockedIds.has(a.id)} onClick={() => dispatch({ type: 'athlete/move', id: a.id, dir: -1 })} title="위로" aria-label={`${a.name} 위로 이동`}>
                     ↑
                   </button>
                   <button
                     disabled={i === state.athletes.length - 1 || lockedIds.has(a.id)}
                     onClick={() => dispatch({ type: 'athlete/move', id: a.id, dir: 1 })}
                     title="아래로"
+                    aria-label={`${a.name} 아래로 이동`}
                   >
                     ↓
                   </button>
                 </span>
-                <button className="roster-del" onClick={() => removeAthlete(a)} title="삭제">
+                <button className="roster-del" onClick={() => removeAthlete(a)} title="삭제" aria-label={`${a.name} 명단에서 제거`}>
                   ✕
                 </button>
               </li>
@@ -278,10 +288,10 @@ export function ParticipantsView() {
           </ul>
         )}
         <p className="hint mt">
-          <b>참가번호 순서 = 개인전 시드 순서.</b> 대진이 생성된 종목의 참가자는 잠금(🔒)됩니다.
+          <b>참가번호 순서가 개인전 시드 순서가 됩니다.</b> 대진이 생성된 종목의 참가자는 잠금(🔒)됩니다.
         </p>
         <div className="part-footer">
-          <span className="save-note">💾 진행 상태는 브라우저에 자동 저장됩니다 · 새로고침해도 복원돼요</span>
+          <span className="save-note">💾 이 브라우저에 자동 저장 중 — 새로고침해도 유지되지만, 다른 PC·브라우저·시크릿 창에서는 보이지 않습니다. 미리 💾 내보내기로 백업해 두세요.</span>
           <button className="btn ghost-danger" onClick={resetAll}>
             🔄 처음부터 다시
           </button>

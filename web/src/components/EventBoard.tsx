@@ -16,7 +16,7 @@ function IndividualParticipation({ ev }: { ev: TEvent }) {
         <h3>
           참가 선수 <small>{teams.length}명</small>
         </h3>
-        <span className="hint inline">체크박스 = 이 종목 참가 여부 · 참가번호 순 = 시드 순</span>
+        <span className="hint inline">체크박스를 체크하면 이 종목에 참가합니다. 참가번호 순서가 시드 순서가 됩니다.</span>
       </div>
       {state.athletes.length === 0 ? (
         <p className="hint">먼저 ① 참가자 등록에서 명단을 만들어 주세요.</p>
@@ -56,14 +56,15 @@ function BracketSetup({ ev, teamCount }: { ev: TEvent; teamCount: number }) {
   const byes = size - teamCount;
 
   const generate = () => {
+    const isRegenerate = ev.matches !== null;
     const msg =
-      ev.matches === null
+      !isRegenerate
         ? `팀 ${teamCount}개로 대진표를 만들까요?${byes > 0 ? ` 부전승(BYE) ${byes}개가 자동 배치됩니다.` : ''}`
         : `다시 생성하면 기존 진행·결과가 사라집니다. 계속할까요?`;
     askConfirm({
-      title: '대진표 생성',
+      title: isRegenerate ? '대진표 다시 만들기' : '대진표 만들기',
       message: msg,
-      confirmLabel: '대진표 생성',
+      confirmLabel: isRegenerate ? '대진표 다시 만들기' : '대진표 만들기',
       onConfirm: () => dispatch({ type: 'event/generate', id: ev.id }),
     });
   };
@@ -104,7 +105,7 @@ function BracketSetup({ ev, teamCount }: { ev: TEvent; teamCount: number }) {
           </div>
         </div>
         <button className="btn primary big" onClick={generate}>
-          {ev.matches === null ? '🚩 대진표 생성' : '↻ 대진표 다시 생성'}
+          {ev.matches === null ? '🚩 대진표 만들기' : '↻ 대진표 다시 만들기'}
         </button>
       </div>
     </div>
@@ -172,7 +173,7 @@ export function EventBoard() {
                     title: '대진표 초기화',
                     message: `“${preset.name}”의 대진표와 모든 결과를 삭제합니다. 팀 구성은 유지됩니다.`,
                     danger: true,
-                    confirmLabel: '초기화',
+                    confirmLabel: '대진표 초기화',
                     onConfirm: () => dispatch({ type: 'event/reset', id: ev.id }),
                   })
                 }
@@ -230,7 +231,7 @@ export function EventBoard() {
                     message:
                       '대진표를 무작위로 다시 섞습니다. 지금까지 진행한 경기의 기록·승자·진출 결과가 모두 사라지고, 무작위 배치로 새 대진표가 만들어집니다. 계속할까요?',
                     danger: true,
-                    confirmLabel: '🎲 다시 섞기',
+                    confirmLabel: '대진 다시 섞기',
                     onConfirm: () => dispatch({ type: 'event/reseedRandom', id: ev.id }),
                   })
                 }
@@ -240,8 +241,7 @@ export function EventBoard() {
             </div>
             <BracketBoard ev={ev} mode="edit" />
             <p className="hint">
-              카드 클릭 = <b>현재 경기 지정</b> (빔프로젝터 모드의 Now Playing 표시) · 이긴 쪽 이름 클릭 ={' '}
-              <b>승리</b> · 점수는 <b>⏱ 기록 입력</b>에서 선택 저장합니다.
+              카드를 클릭하면 <b>현재 경기</b>로 지정되어 빔프로젝터 Now Playing에 표시됩니다. 이긴 팀 이름을 클릭하면 <b>승리</b> 처리되고, 점수는 <b>⏱ 기록 입력</b> 버튼에서 저장합니다.
             </p>
           </div>
         )}

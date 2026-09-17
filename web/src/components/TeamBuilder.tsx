@@ -141,18 +141,20 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
     <div className="builder">
       <div className="builder-controls">
         <div className="seg" role="radiogroup" aria-label="성별 필터">
-          <button className={cls('seg-btn', filter === 'all' && 'active')} onClick={() => setFilter('all')}>
+          <button className={cls('seg-btn', filter === 'all' && 'active')} onClick={() => setFilter('all')} aria-pressed={filter === 'all'}>
             전체 {athletes.length}
           </button>
           <button
             className={cls('seg-btn', filter === 'M' && 'active')}
             onClick={() => setFilter('M')}
+            aria-pressed={filter === 'M'}
           >
             🔵 남자 {athletes.filter((a) => a.gender === 'M').length}
           </button>
           <button
             className={cls('seg-btn', filter === 'F' && 'active')}
             onClick={() => setFilter('F')}
+            aria-pressed={filter === 'F'}
           >
             🔴 여자 {athletes.filter((a) => a.gender === 'F').length}
           </button>
@@ -187,6 +189,7 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
                 title: '팀 목록 비우기',
                 message: '모든 팀 구성을 초기화합니다.',
                 danger: true,
+                confirmLabel: '팀 구성 비우기',
                 onConfirm: () => setTeams([]),
               });
             }}
@@ -309,6 +312,7 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
                           setTeams(arr);
                         }}
                         title="시드 위로"
+                        aria-label={`${t.name} 시드 위로 이동`}
                       >
                         ↑
                       </button>
@@ -320,6 +324,7 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
                           setTeams(arr);
                         }}
                         title="시드 아래로"
+                        aria-label={`${t.name} 시드 아래로 이동`}
                       >
                         ↓
                       </button>
@@ -330,6 +335,11 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
                             ? '2인 팀으로 변경 (3번째 선수는 미배정으로 돌아갑니다)'
                             : '3인 팀으로 변경 (세 번째 슬롯이 열립니다)'
                         }
+                        aria-label={
+                          slotCount === 3
+                            ? `${t.name} 2인 팀으로 변경`
+                            : `${t.name} 3인 팀으로 변경`
+                        }
                       >
                         {slotCount === 3 ? '2⇥' : '3⇥'}
                       </button>
@@ -337,6 +347,7 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
                         className="team-del"
                         onClick={() => setTeams(ev.teams.filter((x) => x.id !== t.id))}
                         title="팀 삭제"
+                        aria-label={`${t.name} 팀 삭제`}
                       >
                         ✕
                       </button>
@@ -374,7 +385,7 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
             </ul>
           )}
           <p className="hint">
-            <b>팀 순서 = 시드 순서</b> (첫 팀이 1번 시드). 개인전은 참가번호 순서가 시드입니다.
+            <b>팀 순서가 시드 순서가 됩니다</b> (첫 팀이 1번 시드). 개인전은 참가번호 순서가 시드입니다.
             3인 팀은 경기마다 표시된 순서대로 2인 조합이 출전합니다.
           </p>
         </div>
