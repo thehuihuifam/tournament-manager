@@ -279,7 +279,7 @@ export function ParticipantsView() {
           </ul>
         )}
         <p className="hint mt">
-          <b>참가번호 순서 = 개인전 시드 순서.</b> 대진이 생성된 종목의 참가자는 잠금(🔒)됩니다.
+          <b>참가번호 순서가 개인전 시드 순서가 됩니다.</b> 대진이 생성된 종목의 참가자는 잠금(🔒)됩니다.
         </p>
         <div className="part-footer">
           <span className="save-note">💾 이 브라우저에 자동 저장 중 — 새로고침해도 유지되지만, 다른 PC·브라우저·시크릿 창에서는 보이지 않습니다. 미리 💾 내보내기로 백업해 두세요.</span>

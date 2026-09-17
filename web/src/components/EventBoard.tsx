@@ -16,7 +16,7 @@ function IndividualParticipation({ ev }: { ev: TEvent }) {
         <h3>
           참가 선수 <small>{teams.length}명</small>
         </h3>
-        <span className="hint inline">체크박스 = 이 종목 참가 여부 · 참가번호 순 = 시드 순</span>
+        <span className="hint inline">체크박스를 체크하면 이 종목에 참가합니다. 참가번호 순서가 시드 순서가 됩니다.</span>
       </div>
       {state.athletes.length === 0 ? (
         <p className="hint">먼저 ① 참가자 등록에서 명단을 만들어 주세요.</p>
@@ -241,8 +241,7 @@ export function EventBoard() {
             </div>
             <BracketBoard ev={ev} mode="edit" />
             <p className="hint">
-              카드 클릭 = <b>현재 경기 지정</b> (빔프로젝터 모드의 Now Playing 표시) · 이긴 쪽 이름 클릭 ={' '}
-              <b>승리</b> · 점수는 <b>⏱ 기록 입력</b>에서 선택 저장합니다.
+              카드를 클릭하면 <b>현재 경기</b>로 지정되어 빔프로젝터 Now Playing에 표시됩니다. 이긴 팀 이름을 클릭하면 <b>승리</b> 처리되고, 점수는 <b>⏱ 기록 입력</b> 버튼에서 저장합니다.
             </p>
           </div>
         )}

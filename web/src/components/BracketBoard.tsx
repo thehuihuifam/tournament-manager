@@ -299,7 +299,7 @@ function MatchCell({
                 {piB && `B측 다음: ${piB.next}`}
               </span>
             )}
-            {!m.decided && both && <span className="win-hint">👆 이긴 쪽 이름 클릭 = 승리</span>}
+            {!m.decided && both && <span className="win-hint">힌트: 이긴 쪽 이름을 클릭하면 승리로 기록됩니다.</span>}
             {m.decided && (
               <button className="btn tiny ghost-danger" onClick={cancelResult}>
                 ↺ 결과 초기화
