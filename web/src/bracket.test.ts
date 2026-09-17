@@ -261,6 +261,92 @@ describe('autoPairGroups 무작위 페어링', () => {
   });
 });
 
+describe('autoPairGroups 같은 성별 무작위 페어링 (same-random)', () => {
+  /** 구성 기준(순서 무관)으로 팀 묶음을 직렬화 — 누를 때마다 달라지는지 비교용 */
+  const canonGroups = (groups: string[][]) =>
+    groups
+      .map((g) => [...g].sort().join('+'))
+      .sort()
+      .join('|');
+
+  it('남6+여4 ×100회 — leftover 0, 전원 정확히 1회, 크기 2|3, 모든 팀 단일 성별, 구성 2종 이상', () => {
+    const pool = poolOf(
+      ['m1', 'f1', 'm2', 'f2', 'm3', 'f3', 'm4', 'f4', 'm5', 'm6'],
+      ['M', 'F', 'M', 'F', 'M', 'F', 'M', 'F', 'M', 'M'],
+    );
+    const signatures = new Set<string>();
+    for (let i = 0; i < 100; i += 1) {
+      const { groups, leftover } = autoPairGroups(pool, 'same-random');
+      expect(leftover).toEqual([]);
+      const flat = groups.flat();
+      expect(new Set(flat).size).toBe(10); // 중복 없음
+      expect([...flat].sort()).toEqual(pool.map((p) => p.id).sort()); // 전원 정확히 1회
+      for (const g of groups) {
+        expect(g.length === 2 || g.length === 3).toBe(true);
+        expect(new Set(g.map((id) => id[0])).size).toBe(1); // 남-남 또는 여-여
+      }
+      signatures.add(canonGroups(groups));
+    }
+    expect(signatures.size).toBeGreaterThanOrEqual(2); // 매번 같은 결과가 아니다
+  });
+
+  it('남 5명 ×100회 — 크기 {2,3}, 3인 팀 구성원 조합이 2종 이상, 전원 1회씩', () => {
+    const pool = poolOf(['m1', 'm2', 'm3', 'm4', 'm5']);
+    const trios = new Set<string>();
+    for (let i = 0; i < 100; i += 1) {
+      const { groups, leftover } = autoPairGroups(pool, 'same-random');
+      expect(sizesOf(groups).sort()).toEqual([2, 3]);
+      expect(leftover).toEqual([]);
+      const flat = groups.flat();
+      expect(new Set(flat).size).toBe(5);
+      expect([...flat].sort()).toEqual(['m1', 'm2', 'm3', 'm4', 'm5']);
+      trios.add([...groups.find((g) => g.length === 3)!].sort().join('+'));
+    }
+    expect(trios.size).toBeGreaterThanOrEqual(2); // 3인 팀이 될 3명도 무작위로 선정된다
+  });
+
+  it('2~20명 성별 혼합 스윕 — leftover 항상 0, 전원 1회씩, 크기 2/3', () => {
+    for (let n = 2; n <= 20; n += 1) {
+      const pool = Array.from({ length: n }, (_, i) => ({
+        id: `p${i}`,
+        gender: (Math.random() < 0.5 ? 'M' : 'F') as 'M' | 'F',
+      }));
+      const { groups, leftover } = autoPairGroups(pool, 'same-random');
+      expect(leftover).toEqual([]);
+      const flat = groups.flat();
+      expect(new Set(flat).size).toBe(n);
+      expect([...flat].sort()).toEqual(pool.map((p) => p.id).sort());
+      for (const g of groups) expect(g.length === 2 || g.length === 3).toBe(true);
+    }
+  });
+
+  it('남 8명 — same은 20회 반복해도 동일, same-random 50회는 2종 이상', () => {
+    const pool = poolOf(['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8']);
+    const fixed = autoPairGroups(pool, 'same');
+    for (let i = 0; i < 20; i += 1) {
+      expect(autoPairGroups(pool, 'same')).toEqual(fixed); // 시드 순 고정
+    }
+    const signatures = new Set<string>();
+    for (let i = 0; i < 50; i += 1) {
+      signatures.add(canonGroups(autoPairGroups(pool, 'same-random').groups));
+    }
+    expect(signatures.size).toBeGreaterThanOrEqual(2); // 무작위 모드는 매번 달라진다
+  });
+
+  it("'same' 회귀 — 남4+여2 → [[m1,m2],[m3,m4],[f1,f2]]", () => {
+    const { groups, leftover } = autoPairGroups(
+      poolOf(['m1', 'm2', 'm3', 'm4', 'f1', 'f2'], ['M', 'M', 'M', 'M', 'F', 'F']),
+      'same',
+    );
+    expect(groups).toEqual([
+      ['m1', 'm2'],
+      ['m3', 'm4'],
+      ['f1', 'f2'],
+    ]);
+    expect(leftover).toEqual([]);
+  });
+});
+
 /* ============================ 3인 팀 출전 조합 ============================ */
 
 const canon = (p: TeamPairing) => [...p].sort().join('+');

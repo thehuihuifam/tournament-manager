@@ -228,6 +228,17 @@ textarea {
   background: #1e40af;
 }
 
+/* 🎲 같은 성별 무작위 페어링 — ⚡(primary)와 🎲(성별 무관) 사이의 중간 톤 (인디고) */
+.btn.random-same {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.btn.random-same:hover:not(:disabled) {
+  background: #e0e7ff;
+}
+
 .btn.big {
   font-size: 1.18rem;
   font-weight: 900;

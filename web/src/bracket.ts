@@ -300,11 +300,18 @@ export interface PairGroups {
  *  - 2인 팀이 하나도 없으면 3인 팀을 분해해 2인 팀 2개로 재편 (총 4명 케이스).
  *  - 남1+여1로 총 2명뿐이면 2인 혼성 팀 허용.
  *
+ * [same-random — 같은 성별 무작위] 위 same 규칙(성별 1명 예외, 3인 팀 분해, leftover 처리)을
+ *  - 그대로 적용하되, 성별 그룹(남/여)을 각각 shuffle()한 뒤에 묶는다.
+ *  - 짝 구성이 누를 때마다 달라지고, 홀수 인원 성별에서 3인 팀이 될 3명도 무작위로 선정된다.
+ *  - 같은 성별(남-남 / 여-여) 제약은 same과 동일하게 유지된다.
+ *
  * [any — 무작위] 전체를 셔플한 뒤, 홀수(3명 이상)면 3인 팀 1개 + 나머지 2인 팀.
  */
+export type PairMode = 'same' | 'same-random' | 'any';
+
 export function autoPairGroups(
   pool: { id: string; gender?: 'M' | 'F' }[],
-  mode: 'same' | 'any',
+  mode: PairMode,
 ): PairGroups {
   if (mode === 'any') {
     const s = shuffle(pool.map((p) => p.id));
@@ -319,8 +326,11 @@ export function autoPairGroups(
     return { groups, leftover: i < s.length ? [s[i]] : [] };
   }
 
-  const males = pool.filter((p) => p.gender === 'M');
-  const females = pool.filter((p) => p.gender !== 'M');
+  // same-random: 성별 그룹 내부 순서만 무작위로 섞고, 이후 규칙은 same과 동일하다.
+  const inModeOrder = (list: { id: string; gender?: 'M' | 'F' }[]) =>
+    mode === 'same-random' ? shuffle(list) : list;
+  const males = inModeOrder(pool.filter((p) => p.gender === 'M'));
+  const females = inModeOrder(pool.filter((p) => p.gender !== 'M'));
 
   /** 한 성별 그룹을 3인(홀수 ≥3) + 2인 팀들로 자른다. 1명뿐이면 leftover. */
   const chunkGender = (list: { id: string; gender?: 'M' | 'F' }[]) => {

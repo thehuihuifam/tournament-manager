@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { useConfirm } from '../uic';
-import { autoPairGroups, shufflePairings, trioPairings } from '../bracket';
+import { autoPairGroups, shufflePairings, trioPairings, type PairMode } from '../bracket';
 import { teamSlotCount } from '../presets';
 import { Gender, Team, TEvent } from '../types';
 import { cls, teamAutoName, uid } from '../format';
 
 /**
  * 더블 종목 팀 빌더.
- * - 성별 필터(전체/남/여) + [남-남/여-여 같은 성별 자동 페어링] + 무작위 페어링
+ * - 성별 필터(전체/남/여) + [남-남/여-여 같은 성별 자동 페어링(시드 순 고정)] +
+ *   [같은 성별 무작위 페어링] + [무작위 페어링(성별 무관)]
  * - 기본 2인 팀, 홀수 인원은 자동으로 3인 팀을 구성해 leftover를 0명으로 만든다
  * - 3인 팀은 세 슬롯 + 경기별 2인 출전 조합(AB/BC/AC, 순서 저장됨)을 표시·관리
  * - 드래그 또는 클릭으로 수동 조립 (세 번째 슬롯 포함)
@@ -57,7 +58,7 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
     setTeams(teams);
   };
 
-  const autoPairAll = (mode: 'same' | 'any') => {
+  const autoPairAll = (mode: PairMode) => {
     const src = athletes
       .filter((a) => filter === 'all' || a.gender === filter)
       .sort((x, y) => x.no - y.no);
@@ -79,8 +80,8 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
           name: teamAutoName(i),
           members: [...g],
           size: 3,
-          // 같은 성별 페어링은 정규 순서, 무작위 페어링은 조합 순서도 랜덤 — 생성 시 한 번만 결정
-          pairings: mode === 'any' ? shufflePairings(base) : base,
+          // 시드 순 모드(same)는 정규 순서, 무작위 모드(any·same-random)는 조합 순서도 랜덤 — 생성 시 한 번만 결정
+          pairings: mode === 'same' ? base : shufflePairings(base),
         };
       }
       return { id: uid('t'), name: teamAutoName(i), members: [...g] };
@@ -88,12 +89,19 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
     setTeams(next);
     const trioCount = next.filter((t) => t.members.length === 3).length;
     const leftoverNames = leftover.map(nameOf).join(', ');
+    // 모드별 설명 — 완료 안내문 끝에 붙인다
+    const modeNote =
+      mode === 'same'
+        ? '참가번호(시드) 순서대로 묶었습니다 — 같은 명단에서는 결과가 항상 같습니다.'
+        : mode === 'same-random'
+          ? '같은 성별은 유지하고 짝(3인 팀이면 3명)을 무작위로 새로 뽑았습니다 — 다시 누르면 또 달라집니다.'
+          : '성별 구분 없이 무작위로 배정했습니다.';
     setNotice(
       leftover.length > 0
         ? `⚠️ ${leftover.length}명이 홀수로 남았습니다: ${leftoverNames} (빈 슬롯에 드래그/클릭으로 수동 추가하세요)`
         : `✅ ${
             trioCount > 0 ? `3명 팀 ${trioCount}개를 포함해 ` : ''
-          }총 ${next.length}개 팀 자동 구성 완료! 팀 순서가 시드 순서가 됩니다.`,
+          }총 ${next.length}개 팀 자동 구성 완료! 팀 순서가 시드 순서가 됩니다. ${modeNote}`,
     );
   };
 
@@ -150,11 +158,26 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
           </button>
         </div>
         <div className="builder-pair">
-          <button className="btn primary" onClick={() => autoPairAll('same')}>
+          <button
+            className="btn primary"
+            onClick={() => autoPairAll('same')}
+            title="같은 성별(남-남 / 여-여)로 참가번호 순서대로 이웃끼리 묶습니다. 같은 명단에서는 누를 때마다 결과가 동일합니다."
+          >
             ⚡ 같은 성별 자동 페어링 (남-남 / 여-여)
           </button>
-          <button className="btn" onClick={() => autoPairAll('any')}>
-            🎲 무작위 페어링
+          <button
+            className="btn random-same"
+            onClick={() => autoPairAll('same-random')}
+            title="같은 성별(남-남 / 여-여)은 유지하고 짝을 무작위로 새로 뽑습니다. 홀수 인원이면 3인 팀이 될 3명도 무작위로 선정되며, 누를 때마다 결과가 달라집니다."
+          >
+            🎲 같은 성별 무작위 페어링
+          </button>
+          <button
+            className="btn"
+            onClick={() => autoPairAll('any')}
+            title="성별 구분 없이 전체를 무작위로 짝지어 팀을 구성합니다."
+          >
+            🎲 무작위 페어링 (성별 무관)
           </button>
           <button
             className="btn ghost-danger"
