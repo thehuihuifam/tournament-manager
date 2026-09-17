@@ -224,8 +224,8 @@ export function EventBoard() {
             </div>
             <BracketBoard ev={ev} mode="edit" />
             <p className="hint">
-              카드 클릭 = <b>현재 경기 지정</b> (빔프로젝터 모드의 Now Playing 표시) · 점수를 모두 입력하면{' '}
-              <b>🏁 승자 결정</b> · 승자가 다음 라운드로 자동 진출합니다.
+              카드 클릭 = <b>현재 경기 지정</b> (빔프로젝터 모드의 Now Playing 표시) · 이긴 쪽 이름 클릭 ={' '}
+              <b>승리</b> · 점수는 <b>⏱ 기록 입력</b>에서 선택 저장합니다.
             </p>
           </div>
         )}

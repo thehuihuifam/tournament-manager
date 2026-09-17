@@ -42,17 +42,55 @@ export function buildMatches(teams: Team[], seedMode: SeedMode): Match[] {
   const n = teams.length;
   const size = nextPow2(n);
   const rounds = Math.round(Math.log2(size));
+  const pairCount = size / 2;
+  const byeCount = size - n;
+  const pattern = seedPattern(size);
   const slots: (string | null)[] = Array(size).fill(null);
 
+  // BYE는 한 매치에 하나만 두고, 1라운드 전체에 등간격으로 배치한다.
+  // random 모드에서는 같은 수의 매치 위치만 무작위로 뽑는다.
+  const byePairs =
+    seedMode === 'order'
+      ? Array.from({ length: byeCount }, (_, i) => Math.floor((i * pairCount) / byeCount))
+      : shuffle(Array.from({ length: pairCount }, (_, i) => i)).slice(0, byeCount);
   if (seedMode === 'order') {
-    const pattern = seedPattern(size);
-    pattern.forEach((seedVal, slot) => {
-      const idx = seedVal - 1;
-      if (idx < n) slots[slot] = teams[idx].id;
+    const reservedSlots = new Set<number>();
+
+    // 상위 시드는 BYE 매치의 더 높은 슬롯(시드 패턴 값이 작은 쪽)에 배치한다.
+    byePairs.forEach((pair, i) => {
+      const left = pair * 2;
+      const right = left + 1;
+      const seedSlot = pattern[left] < pattern[right] ? left : right;
+      slots[seedSlot] = teams[i].id;
+      reservedSlots.add(left);
+      reservedSlots.add(right);
+    });
+
+    // BYE가 없는 매치의 슬롯을 시드 순으로 채워 기존 표준 시드 패턴을 유지한다.
+    const openSlots = Array.from({ length: size }, (_, slot) => slot)
+      .filter((slot) => !reservedSlots.has(slot))
+      .sort((a, b) => pattern[a] - pattern[b]);
+    teams.slice(byeCount).forEach((team, i) => {
+      slots[openSlots[i]] = team.id;
     });
   } else {
-    const order = shuffle(teams);
-    for (let i = 0; i < n; i++) slots[i] = order[i].id;
+    const byeSlots = new Set<number>();
+    const playableSlots: number[] = [];
+
+    // BYE 위치(좌/우)는 매치마다 따로 무작위로 정하고, 나머지 슬롯에는 셔플한 팀을 채운다.
+    byePairs.forEach((pair) => {
+      const left = pair * 2;
+      const right = left + 1;
+      const byeSlot = Math.random() < 0.5 ? left : right;
+      byeSlots.add(byeSlot);
+      playableSlots.push(byeSlot === left ? right : left);
+    });
+    for (let slot = 0; slot < size; slot++) {
+      if (!byeSlots.has(slot) && !playableSlots.includes(slot)) playableSlots.push(slot);
+    }
+    shuffle(teams).forEach((team, i) => {
+      slots[playableSlots[i]] = team.id;
+    });
   }
 
   const matches: Match[] = [];

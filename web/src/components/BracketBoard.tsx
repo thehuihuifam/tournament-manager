@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { useConfirm } from '../uic';
-import { decideFromScores, effectiveCurrentId, matchListByRound } from '../bracket';
+import { effectiveCurrentId, matchListByRound } from '../bracket';
 import { getTeams, presetOf, roundName, teamMap } from '../presets';
 import { Match, ScoreMode, Team, TEvent } from '../types';
 import { cls, formatTime, parseTime } from '../format';
@@ -11,12 +11,10 @@ import { cls, formatTime, parseTime } from '../format';
 function ScoreInput({
   value,
   mode,
-  tick,
   onCommit,
 }: {
   value: number | null;
   mode: ScoreMode;
-  tick: number;
   onCommit: (v: number | null) => void;
 }) {
   const [draft, setDraft] = useState(value == null ? '' : mode === 'time' ? String(value / 1000) : String(value));
@@ -24,7 +22,7 @@ function ScoreInput({
 
   useEffect(() => {
     setDraft(value == null ? '' : mode === 'time' ? String(value / 1000) : String(value));
-  }, [value, mode, tick]);
+  }, [value, mode]);
 
   const commit = () => {
     const t = draft.trim();
@@ -66,15 +64,17 @@ function Slot({
   m,
   side,
   map,
-  tick,
+  recordOpen,
   onScore,
+  onWin,
 }: {
   ev: TEvent;
   m: Match;
   side: 'A' | 'B';
   map: Map<string, Team>;
-  tick: number;
+  recordOpen: boolean;
   onScore: (side: 'A' | 'B', v: number | null) => void;
+  onWin: (side: 'A' | 'B') => void;
 }) {
   const { state } = useStore();
   const preset = presetOf(ev.id);
@@ -92,10 +92,34 @@ function Slot({
       ? team.members.map((id) => state.athletes.find((a) => a.id === id)?.name ?? '??').join(' · ')
       : null;
 
-  const showInput = both && !m.decided;
+  const showInput = both && recordOpen;
+  const selectable = both && !m.decided && !!tid;
 
   return (
-    <div className={clsList}>
+    <div
+      className={cls(clsList, selectable && 'selectable')}
+      onClick={
+        selectable
+          ? (e) => {
+              e.stopPropagation();
+              onWin(side);
+            }
+          : undefined
+      }
+      onKeyDown={
+        selectable
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onWin(side);
+              }
+            }
+          : undefined
+      }
+      role={selectable ? 'button' : undefined}
+      tabIndex={selectable ? 0 : undefined}
+      aria-label={selectable ? `${team?.name ?? ''} 승리 처리` : undefined}
+    >
       <span className="slot-tag">{side}</span>
       {tid ? (
         <span className="slot-name" title={memberNames ?? undefined}>
@@ -107,9 +131,9 @@ function Slot({
       )}
       <span className="slot-score">
         {showInput ? (
-          <ScoreInput value={score} mode={ev.scoreMode} tick={tick} onCommit={(v) => onScore(side, v)} />
+          <ScoreInput value={score} mode={ev.scoreMode} onCommit={(v) => onScore(side, v)} />
         ) : score == null ? (
-          '—'
+          ''
         ) : ev.scoreMode === 'time' ? (
           formatTime(score)
         ) : (
@@ -146,34 +170,17 @@ function MatchCell({
 }) {
   const { dispatch } = useStore();
   const { askConfirm } = useConfirm();
-  const [tick, setTick] = useState(0);
+  const [recordOpen, setRecordOpen] = useState(false);
   const both = !!(m.a && m.b);
-  const tied =
-    both && m.scoreA != null && m.scoreB != null && m.scoreA === m.scoreB;
-  const autoWinner = both ? decideFromScores(m, ev.scoreMode) : null;
-
-  const nameOf = (tid: string | null) => (tid ? map.get(tid)?.name ?? '—' : null);
 
   const onScore = (side: 'A' | 'B', v: number | null) => {
+    // 기록은 승자 판정과 독립적으로 저장한다.
     dispatch({ type: 'match/score', id: ev.id, matchId: m.id, side, value: v });
-    if (!m.decided) return;
-    // 결정된 매치의 점수 수정: 승자가 바뀌면 다음 라운드부터 초기화(확인 필요)
-    const next = { ...m, [side === 'A' ? 'scoreA' : 'scoreB']: v };
-    const w = decideFromScores(next, ev.scoreMode);
-    if (w === m.winner) return;
-    askConfirm({
-      title: '점수 수정 · 승자 변경',
-      message: `결과가 “${nameOf(m.winner === 'A' ? m.a : m.b)}” → “${
-        w ? nameOf(w === 'A' ? m.a : m.b) : '무승부(결과 해제)'
-      }”으로 바뀝니다. 다음 라운드부터의 진출·결과가 자동으로 초기화됩니다.`,
-      danger: true,
-      confirmLabel: '초기화하고 수정',
-      onConfirm: () => {
-        dispatch({ type: 'match/score', id: ev.id, matchId: m.id, side, value: v });
-        dispatch({ type: 'match/setResult', id: ev.id, matchId: m.id, winner: w, clearScores: false });
-        setTick((t) => t + 1);
-      },
-    });
+  };
+
+  const onWin = (side: 'A' | 'B') => {
+    if (!both || m.decided) return;
+    dispatch({ type: 'match/setResult', id: ev.id, matchId: m.id, winner: side, clearScores: false });
   };
 
   const cancelResult = () =>
@@ -184,7 +191,7 @@ function MatchCell({
       confirmLabel: '초기화',
       onConfirm: () => {
         dispatch({ type: 'match/setResult', id: ev.id, matchId: m.id, winner: null, clearScores: true });
-        setTick((t) => t + 1);
+        setRecordOpen(false);
       },
     });
 
@@ -210,29 +217,16 @@ function MatchCell({
         onClick={clickable}
         role={clickable ? 'button' : undefined}
       >
-        <Slot ev={ev} m={m} side="A" map={map} tick={tick} onScore={onScore} />
-        <Slot ev={ev} m={m} side="B" map={map} tick={tick} onScore={onScore} />
+        <Slot ev={ev} m={m} side="A" map={map} recordOpen={recordOpen} onScore={onScore} onWin={onWin} />
+        <Slot ev={ev} m={m} side="B" map={map} recordOpen={recordOpen} onScore={onScore} onWin={onWin} />
         {mode === 'edit' && (
           <div className="mfoot" onClick={(e) => e.stopPropagation()}>
-            {!m.decided && both && (
-              <>
-                <button
-                  className="btn tiny primary"
-                  disabled={!autoWinner}
-                  onClick={() => dispatch({ type: 'match/decide', id: ev.id, matchId: m.id })}
-                  title={tied ? '동률입니다. 아래 버튼으로 수동 지정하세요' : '입력된 기록으로 승자 결정'}
-                >
-                  🏁 승자 결정
-                </button>
-                <button className="btn tiny" onClick={() => dispatch({ type: 'match/setResult', id: ev.id, matchId: m.id, winner: 'A', clearScores: false })} title={`${nameOf(m.a)} 수동 승`}>
-                  A승
-                </button>
-                <button className="btn tiny" onClick={() => dispatch({ type: 'match/setResult', id: ev.id, matchId: m.id, winner: 'B', clearScores: false })} title={`${nameOf(m.b)} 수동 승`}>
-                  B승
-                </button>
-                {tied && <span className="tie-hint">동률</span>}
-              </>
+            {both && (
+              <button className="btn tiny" onClick={() => setRecordOpen((open) => !open)}>
+                ⏱ 기록 {recordOpen ? '닫기' : '입력'}
+              </button>
             )}
+            {!m.decided && both && <span className="win-hint">👆 이긴 쪽 이름 클릭 = 승리</span>}
             {m.decided && (
               <button className="btn tiny ghost-danger" onClick={cancelResult}>
                 ↺ 결과 초기화
