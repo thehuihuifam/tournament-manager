@@ -10,7 +10,15 @@ import {
   withValidPairings,
 } from './bracket';
 import { getTeams, teamMap } from './presets';
-import { Athlete, Team, TeamPairing, TEvent } from './types';
+import { defaultState, reducer } from './store';
+import {
+  DEFAULT_PROJECTOR_THEME,
+  normalizeProjectorTheme,
+  projectorThemeClass,
+  projectorThemeToggleLabel,
+  toggleProjectorTheme,
+} from './theme';
+import { AppState, ProjectorTheme, SeedMode, Athlete, Team, TeamPairing, TEvent } from './types';
 
 function makeTeams(count: number): Team[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -398,5 +406,211 @@ describe('3인 팀의 getTeams · 브래킷 통합', () => {
     const final = built.find((m) => m.round === 1)!;
     expect(final.a).toBe('trio');
     expect(final.pairingA).toBe(0);
+  });
+});
+
+/* ============================ 🎲 대진 무작위 재배치 (reducer 경로) ============================ */
+
+
+/** 더블 종목에 2인 팀 N개를 넣은 상태 (참가자는 팀 데이터에만 필요 없음) */
+function doubleState(teamCount: number, seedMode: SeedMode = 'order'): AppState {
+  const teams: Team[] = Array.from({ length: teamCount }, (_, i) => ({
+    id: `team-${i + 1}`,
+    name: `팀 ${i + 1}`,
+    members: [`a${i * 2 + 1}`, `a${i * 2 + 2}`],
+  }));
+  const base = defaultState();
+  return {
+    ...base,
+    events: base.events.map((ev) => (ev.id === 'dbl-333' ? { ...ev, teams, seedMode } : ev)),
+  };
+}
+
+const eventOf = (state: AppState) => state.events.find((e) => e.id === 'dbl-333')!;
+
+describe('🎲 대진 무작위 재배치 — event/reseedRandom', () => {
+  it('시드 모드가 random으로 바뀌고 대진표가 새로 만들어진다', () => {
+    const next = reducer(doubleState(8), { type: 'event/reseedRandom', id: 'dbl-333' });
+    const ev = eventOf(next);
+    expect(ev.seedMode).toBe('random');
+    expect(ev.matches).not.toBeNull();
+    expect(ev.matches).toHaveLength(7); // 8팀 → 4+2+1
+    expect(ev.currentMatchId).toBeTruthy();
+  });
+
+  it('100회 재배치 — 팀이 중복/누락 없이 정확히 한 번씩, BYE-BYE 없이 모든 슬롯이 채워진다', () => {
+    const ids = doubleState(27).events.find((e) => e.id === 'dbl-333')!.teams.map((t) => t.id).sort();
+    for (let i = 0; i < 100; i += 1) {
+      const ev = eventOf(reducer(doubleState(27), { type: 'event/reseedRandom', id: 'dbl-333' }));
+      const round0 = ev.matches!.filter((m) => m.round === 0);
+      const placed = round0.flatMap((m) => [m.a, m.b]).filter((x): x is string => !!x);
+
+      expect(ev.matches).toHaveLength(31); // 32칸 → 16+8+4+2+1
+      expect(round0).toHaveLength(16);
+      expect(new Set(placed).size).toBe(27); // 중복 없음
+      expect([...placed].sort()).toEqual(ids); // 누락 없음 (정확히 한 번씩)
+      expect(round0.some((m) => !m.a && !m.b)).toBe(false); // BYE-BYE 금지
+
+      const byes = round0.filter((m) => m.a === null || m.b === null);
+      expect(byes).toHaveLength(5); // 32 − 27, 무작위 모드에서도 균등 분산
+      expect(byes.every((m) => (m.a === null) !== (m.b === null))).toBe(true);
+      expect(byes.every((m) => m.decided && m.winner)).toBe(true); // BYE는 즉시 통과
+    }
+  });
+
+  it('2^n 팀(4·8·16)에서는 BYE 없이 전 슬롯이 채워진다', () => {
+    for (const n of [4, 8, 16]) {
+      const ev = eventOf(reducer(doubleState(n), { type: 'event/reseedRandom', id: 'dbl-333' }));
+      const round0 = ev.matches!.filter((m) => m.round === 0);
+      expect(round0).toHaveLength(n / 2);
+      expect(round0.flatMap((m) => [m.a, m.b]).filter(Boolean)).toHaveLength(n);
+      expect(round0.some((m) => !m.a && !m.b)).toBe(false);
+    }
+  });
+});
+
+/* ============================ 🔀 조합 순서 랜덤 섞기 (reducer 경로) ============================ */
+
+describe('🔀 3인 팀 출전 조합 순서 랜덤 섞기 — team/shufflePairings', () => {
+  const trio: Team = {
+    id: 'trio',
+    name: '트리오',
+    members: ['A', 'B', 'C'],
+    size: 3,
+    pairings: trioPairings(['A', 'B', 'C']),
+  };
+  const trioState = (): AppState => {
+    const base = defaultState();
+    return {
+      ...base,
+      events: base.events.map((ev) => (ev.id === 'dbl-333' ? { ...ev, teams: [trio] } : ev)),
+    };
+  };
+  const pairingsOf = (state: AppState) => eventOf(state).teams[0].pairings!;
+
+  it('100회 섞어도 조합 집합은 항상 AB·BC·AC, 구성원이 바뀌지 않는다', () => {
+    let state = trioState();
+    const seen = new Set<string>();
+    for (let i = 0; i < 100; i += 1) {
+      state = reducer(state, { type: 'team/shufflePairings', id: 'dbl-333', teamId: 'trio' });
+      const pairings = pairingsOf(state);
+      expect(pairings).toHaveLength(3);
+      expect(pairings.map(canon).sort()).toEqual(['A+B', 'A+C', 'B+C']);
+      expect(pairingsCover(pairings, ['A', 'B', 'C'])).toBe(true);
+      expect(eventOf(state).teams[0].members).toEqual(['A', 'B', 'C']);
+      seen.add(pairings.map((p) => p.join(',')).join('|'));
+    }
+    expect(seen.size).toBeGreaterThan(1); // 실제로 순서가 섞인다
+  });
+
+  it('섞인 순서는 정규화(withValidPairings)와 저장/복구를 거쳐도 그대로 유지된다', () => {
+    const shuffled = reducer(trioState(), { type: 'team/shufflePairings', id: 'dbl-333', teamId: 'trio' });
+    const order = pairingsOf(shuffled).map((p) => p.join(','));
+    const restored = withValidPairings(JSON.parse(JSON.stringify(eventOf(shuffled).teams[0])) as Team);
+    expect(restored.pairings!.map((p) => p.join(','))).toEqual(order);
+  });
+
+  it('pairings가 없는 2인 팀에는 아무 변화가 없다', () => {
+    const before = doubleState(4);
+    const after = reducer(before, { type: 'team/shufflePairings', id: 'dbl-333', teamId: 'team-2' });
+    expect(eventOf(after).teams).toEqual(eventOf(before).teams);
+  });
+
+  it('이미 결정된 경기의 점수·승자·진출은 섞어도 그대로다', () => {
+    const base = trioState();
+    const teams2: Team[] = [
+      trio,
+      { id: 'pair-1', name: 'B팀', members: ['D', 'E'] },
+      { id: 'pair-2', name: 'C팀', members: ['F', 'G'] },
+      { id: 'pair-3', name: 'D팀', members: ['H', 'I'] },
+    ];
+    const decided: AppState = {
+      ...base,
+      events: base.events.map((e) =>
+        e.id === 'dbl-333'
+          ? {
+              ...e,
+              teams: teams2,
+              matches: buildMatches(teams2, 'order').map((m) => ({ ...m })),
+            }
+          : e,
+      ),
+    };
+    const withResult: AppState = {
+      ...decided,
+      events: decided.events.map((e) => {
+        if (e.id !== 'dbl-333' || !e.matches) return e;
+        const matches = e.matches.map((m, i) =>
+          i === 0 ? { ...m, scoreA: 12345, decided: true, winner: 'A' as const } : m,
+        );
+        return { ...e, matches: propagate(matches, teamMap(teams2)) };
+      }),
+    };
+    const evBefore = eventOf(withResult);
+    const after = reducer(withResult, { type: 'team/shufflePairings', id: 'dbl-333', teamId: 'trio' });
+    const evAfter = eventOf(after);
+
+    expect(evAfter.matches!.map((m) => [m.scoreA, m.scoreB, m.winner, m.decided, m.a, m.b])).toEqual(
+      evBefore.matches!.map((m) => [m.scoreA, m.scoreB, m.winner, m.decided, m.a, m.b]),
+    );
+    expect(pairingsOf(after).map(canon).sort()).toEqual(['A+B', 'A+C', 'B+C']);
+  });
+});
+
+/* ============================ ☀️/🌙 프로젝터 테마 (순수 로직) ============================ */
+
+describe('☀️/🌙 프로젝터 테마 — 기본 라이트 · 저장/복구 안전', () => {
+  it('기본값은 라이트다', () => {
+    expect(DEFAULT_PROJECTOR_THEME).toBe('light');
+    expect(defaultState().projectorTheme).toBe('light');
+  });
+
+  it('기존 저장 데이터에 테마 필드가 없거나 손상돼 있으면 라이트로 복구한다', () => {
+    expect(normalizeProjectorTheme(undefined)).toBe('light');
+    expect(normalizeProjectorTheme(null)).toBe('light');
+    expect(normalizeProjectorTheme('')).toBe('light');
+    expect(normalizeProjectorTheme('neon')).toBe('light');
+    expect(normalizeProjectorTheme(1)).toBe('light');
+    expect(normalizeProjectorTheme('dark')).toBe('dark');
+    expect(normalizeProjectorTheme('light')).toBe('light');
+  });
+
+  it('토글은 라이트 ↔ 다크를 왕복한다', () => {
+    expect(toggleProjectorTheme('light')).toBe('dark');
+    expect(toggleProjectorTheme('dark')).toBe('light');
+    expect(toggleProjectorTheme(normalizeProjectorTheme(undefined))).toBe('dark');
+  });
+
+  it('테마 클래스/라벨이 현재 테마와 일치한다', () => {
+    expect(projectorThemeClass('light')).toBe('pj-light');
+    expect(projectorThemeClass('dark')).toBe('pj-dark');
+    expect(projectorThemeToggleLabel('light')).toBe('🌙 다크'); // 라이트 → 다크로 전환
+    expect(projectorThemeToggleLabel('dark')).toBe('☀️ 라이트'); // 다크 → 라이트로 전환
+  });
+
+  it('reducer: ui/projectorThemeToggle · ui/projectorTheme 가 테마만 바꾼다', () => {
+    const s0 = defaultState();
+    const s1 = reducer(s0, { type: 'ui/projectorThemeToggle' });
+    expect(s1.projectorTheme).toBe('dark');
+    const s2 = reducer(s1, { type: 'ui/projectorThemeToggle' });
+    expect(s2.projectorTheme).toBe('light');
+    expect(s2.athletes).toEqual(s0.athletes);
+    expect(s2.events).toEqual(s0.events);
+    expect(s2.projector).toBe(false);
+
+    const s3 = reducer(s0, { type: 'ui/projectorTheme', theme: 'dark' });
+    expect(s3.projectorTheme).toBe('dark');
+    const s4 = reducer(s3, { type: 'ui/projectorTheme', theme: 'weird' as unknown as ProjectorTheme });
+    expect(s4.projectorTheme).toBe('light'); // 알 수 없는 값은 라이트로 정규화
+  });
+
+  it('reducer: 발표 모드 on/off 는 테마를 건드리지 않는다 (테마는 저장·유지)', () => {
+    const dark = reducer(defaultState(), { type: 'ui/projectorThemeToggle' });
+    const on = reducer(dark, { type: 'ui/projector', on: true });
+    expect(on.projector).toBe(true);
+    expect(on.projectorTheme).toBe('dark');
+    const off = reducer(on, { type: 'ui/projector', on: false });
+    expect(off.projector).toBe(false);
+    expect(off.projectorTheme).toBe('dark');
   });
 });

@@ -3,6 +3,7 @@ import { effectiveCurrentId, matchListByRound, podium } from '../bracket';
 import { eventStatus, getTeams, presetOf, roundCount, roundName, teamMap } from '../presets';
 import { Match, ScoreMode, Team, TEvent } from '../types';
 import { cls, formatTime } from '../format';
+import { projectorThemeClass, projectorThemeToggleLabel } from '../theme';
 import { BracketBoard } from './BracketBoard';
 import { PodiumCard } from './Podium';
 
@@ -10,8 +11,16 @@ function sideName(t: Team | undefined): string {
   return t?.name ?? '—';
 }
 
+/** 이름 길이에 따른 축소 단계 — 4~6글자는 크게, 7글자 이상은 한 줄에 담기도록 작게 */
+function nameFitClass(name: string): string {
+  const len = [...name].length;
+  if (len >= 10) return 'name-fit-3';
+  if (len >= 7) return 'name-fit-2';
+  return '';
+}
+
 function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string, Team> }) {
-  const { state } = useStore();
+  const { state, dispatch } = useStore();
   const preset = presetOf(ev.id);
   const a = cur.a ? map.get(cur.a) : undefined;
   const b = cur.b ? map.get(cur.b) : undefined;
@@ -35,8 +44,17 @@ function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string,
   const scoreA = scoreText(cur.scoreA, ev.scoreMode);
   const scoreB = scoreText(cur.scoreB, ev.scoreMode);
 
+  // 🔀 조합 순서 랜덤 섞기 — 3인 팀이 포함된 측만 표시 (2인 팀만 있으면 버튼 없음)
+  const trioSides = (['A', 'B'] as const).filter(
+    (s) => ((s === 'A' ? a : b)?.pairings?.length ?? 0) > 1,
+  );
+  const shuffleLabel =
+    trioSides.length === 2 ? '🔀 양측 조합 섞기' : trioSides[0] === 'A' ? '🔀 A측 조합 섞기' : '🔀 B측 조합 섞기';
+  // 3인 팀 경기에서는 출전 조합·섞기 줄이 추가되므로 이름/보조 글자를 한 단계 낮춰 카드 안에 담는다
+  const withPairs = !cur.decided && trioSides.length > 0;
+
   return (
-    <div className="now">
+    <div className={cls('now', withPairs && 'now-with-pairs')}>
       <div className="now-head">
         <span className="now-round">{roundName(ev.matches!, cur.round)}</span>
         <span className="now-live">● 진행 중</span>
@@ -46,7 +64,7 @@ function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string,
       </div>
       <div className="now-body">
         <div className={cls('now-side', cur.winner === 'A' && 'winner', cur.winner === 'B' && 'loser')}>
-          <div className="now-name">{sideName(a)}</div>
+          <div className={cls('now-name', nameFitClass(sideName(a)))}>{sideName(a)}</div>
           <div className="now-members">{membersOf(a) ?? '\u00A0'}</div>
           {pairNowA && <div className="now-pair">▶ 출전: {pairNowA}</div>}
           {pairNextA && <div className="now-pair-next">다음 조합: {pairNextA}</div>}
@@ -57,7 +75,7 @@ function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string,
           VS
         </div>
         <div className={cls('now-side', cur.winner === 'B' && 'winner', cur.winner === 'A' && 'loser')}>
-          <div className="now-name">{sideName(b)}</div>
+          <div className={cls('now-name', nameFitClass(sideName(b)))}>{sideName(b)}</div>
           <div className="now-members">{membersOf(b) ?? '\u00A0'}</div>
           {pairNowB && <div className="now-pair">▶ 출전: {pairNowB}</div>}
           {pairNextB && <div className="now-pair-next">다음 조합: {pairNextB}</div>}
@@ -65,6 +83,23 @@ function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string,
           {cur.winner === 'B' && <div className="now-flag">🏆 승</div>}
         </div>
       </div>
+      {withPairs && (
+        <div className="now-shuffle">
+          <button
+            className="pj-shuffle"
+            title="3인 팀의 출전 조합 순서를 랜덤으로 다시 섞습니다 — 현재·다음 출전 조합 표시가 바뀌고, 팀 구성·점수·승자·진출 결과는 그대로 유지됩니다."
+            onClick={() =>
+              trioSides.forEach((s) => {
+                const tid = s === 'A' ? cur.a : cur.b;
+                if (tid) dispatch({ type: 'team/shufflePairings', id: ev.id, teamId: tid });
+              })
+            }
+          >
+            {shuffleLabel}
+          </button>
+          <span className="pj-shuffle-note">출전 조합 순서만 다시 섞기 · 점수·승자·진출은 그대로</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -72,6 +107,7 @@ function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string,
 /**
  * 빔프로젝터 발표 모드 — 고대비 · 대형 글씨 · 전체화면.
  * 편집/관리 UI를 모두 숨기고 대진표 + 현재 경기(Now Playing)만 크게 띄운다.
+ * 테마는 라이트가 기본이며 상단 ☀️/🌙 버튼으로 다크와 전환한다(저장됨).
  */
 export function ProjectorView() {
   const { state, dispatch } = useStore();
@@ -96,7 +132,7 @@ export function ProjectorView() {
   const nm = (id: string | null) => (id ? map.get(id)?.name ?? '—' : null);
 
   return (
-    <div className="projector">
+    <div className={cls('projector', projectorThemeClass(state.projectorTheme))}>
       <div className="pj-top">
         <div className="pj-brand">
           🥤 스포츠스태킹 <b>{preset.name}</b>
@@ -116,9 +152,21 @@ export function ProjectorView() {
             );
           })}
         </div>
-        <button className="pj-exit" onClick={() => dispatch({ type: 'ui/projector', on: false })}>
-          ✕ 종료 <small>(ESC)</small>
-        </button>
+        <div className="pj-top-actions">
+          <button
+            className="pj-theme"
+            aria-label="테마 전환"
+            title={`프로젝터 테마 전환 (현재: ${
+              state.projectorTheme === 'dark' ? '다크' : '라이트'
+            }) · 선택한 테마는 새로고침 후에도 유지됩니다`}
+            onClick={() => dispatch({ type: 'ui/projectorThemeToggle' })}
+          >
+            {projectorThemeToggleLabel(state.projectorTheme)}
+          </button>
+          <button className="pj-exit" onClick={() => dispatch({ type: 'ui/projector', on: false })}>
+            ✕ 종료 <small>(ESC)</small>
+          </button>
+        </div>
       </div>
 
       {res ? (

@@ -194,6 +194,8 @@ textarea {
   border-radius: 18px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07);
   padding: 22px;
+  /* 그리드/플렉스 안에서 내용 최소폭이 아니라 트랙 폭에 맞춰 줄어들게 */
+  min-width: 0;
 }
 
 .panel-title {
@@ -366,7 +368,7 @@ textarea {
 
 .part-grid {
   display: grid;
-  grid-template-columns: 1fr 1.25fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
   gap: 20px;
   align-items: start;
 }
@@ -434,6 +436,8 @@ textarea {
 
 .roster-name {
   flex: 1;
+  /* input 의 고유 min-content(브라우저 기본 size)가 레이아웃을 밀어내지 않도록 width: 0 + flex-grow */
+  width: 0;
   min-width: 0;
   border: 0;
   background: transparent;
@@ -687,7 +691,7 @@ textarea {
 
 .builder-cols {
   display: grid;
-  grid-template-columns: 1fr 1.35fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
   gap: 18px;
   align-items: start;
 }
@@ -1079,13 +1083,16 @@ textarea {
 
 .bracket {
   --gap-x: 56px;
-  --row-h: 138px;
+  /* 카드 최대 높이(기록 입력까지 열었을 때 ≈166px)보다 크게 — 행 사이 카드 겹침 방지 */
+  --row-h: 176px;
   --col-w: 305px;
+  /* 라운드 헤더는 .br-col의 padding-top 영역에 그린다 — 카드와 겹치지 않음 */
+  --head-h: 44px;
   display: flex;
   align-items: stretch;
   gap: var(--gap-x);
   overflow-x: auto;
-  padding: 46px 8px 18px;
+  padding: 12px 8px 18px;
 }
 
 .br-col {
@@ -1094,6 +1101,8 @@ textarea {
   min-width: var(--col-w);
   position: relative;
   flex: none;
+  /* 라운드명/경기 수 헤더가 들어갈 자리 (헤더는 top:0 에 절대배치) */
+  padding-top: var(--head-h);
 }
 
 .br-round {
@@ -1257,6 +1266,16 @@ textarea {
   text-overflow: ellipsis;
 }
 
+/* 팀 이름 한 줄 (긴 이름은 말줄임) — 구성원/조합 줄이 밀려나지 않게 */
+.slot-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .slot-members {
   font-size: 0.72rem;
   font-weight: 700;
@@ -1264,6 +1283,9 @@ textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* 공백에서만 줄바꿈 — 좁아져도 한글 이름이 글자 단위로 끊기지 않는다 */
+  overflow-wrap: normal;
+  word-break: keep-all;
 }
 
 /* 3인 팀 슬롯: 구성원 + 현재 출전 조합을 세로로 표시 (긴 이름 줄바꿈 허용) */
@@ -1351,6 +1373,23 @@ textarea {
 .pair-btn {
   border-color: #ddd6fe;
   color: #6d28d9;
+}
+
+/* 3인 팀 슬롯: 구성원 전체 대신 현재 출전 조합을 한 줄로 보여 카드 높이를 예측 가능하게 유지
+   (전체 구성원은 카드 툴팁 · 팀 빌더 · 프로젝터 Now Playing에서 확인) */
+.slot-name.wrap .slot-members {
+  display: none;
+}
+
+/* 🔀 3인 팀 출전 조합 순서 랜덤 섞기 (매치 카드 푸터 · 편집 모드) */
+.pair-shuffle {
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+/* 🎲 대진 무작위 재배치 (보드 상태 표시줄) */
+.shuffle-seed {
+  margin-left: auto;
 }
 
 .cur-hint {
@@ -1533,66 +1572,148 @@ textarea {
 }
 
 /* ============================================================
-   📺 빔프로젝터 발표 모드 — 고대비 · 대형 · 전체화면
+   📺 빔프로젝터 발표 모드 — 라이트 기본 · ☀️/🌙 테마 전환(저장됨)
+   원칙: 고대비 · 대형 글씨 · 안쪽/바깥쪽 불필요한 스크롤바 없음
    ============================================================ */
 
 .projector {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: #04060c;
-  color: #ffffff;
-  font-size: clamp(14px, 1.05vw, 30px);
+  /* 발표 화면 배율 — 가로/세로 중 작은 쪽(vmin) 기준이라 16:9 · 4:3 모두 안정적 */
+  --pj-font: clamp(16px, 2.2vmin + 0.2vw, 30px);
+
+  /* ☀️ 라이트 테마 (기본값) — 밝은 배경 + 진한 글자 */
+  --pj-bg: #eef2f7;
+  --pj-panel: #ffffff;
+  --pj-panel-2: #f1f5f9;
+  --pj-edge: #0f172a;
+  --pj-line: #64748b;
+  --pj-text: #0b1220;
+  --pj-muted: #475569;
+  --pj-muted-2: #52606f;
+  --pj-accent: #b45309;
+  --pj-accent-soft: rgba(217, 119, 6, 0.16);
+  --pj-score: #0e7490;
+  --pj-live: #dc2626;
+  --pj-chip-bg: #ffffff;
+  --pj-chip-edge: #cbd5e1;
+  --pj-chip-text: #334155;
+  --pj-chip-active-bg: #fff7d6;
+  --pj-match-bg: #ffffff;
+  --pj-match-edge: #94a3b8;
+  --pj-match-decided: #f1f5f9;
+  --pj-slot-tag-bg: #e2e8f0;
+  --pj-slot-tag-text: #475569;
+  --pj-winner-bg: #dcfce7;
+  --pj-winner-edge: #15803d;
+  --pj-bye-bg: #f1f5f9;
+  --pj-pair: #1d4ed8;
+  --pj-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+
+  background: var(--pj-bg);
+  color: var(--pj-text);
+  font-size: var(--pj-font);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
+/* 🌙 다크 테마 — 체육관 조명을 낮추거나 어두운 강당에서 사용 */
+.projector.pj-dark {
+  --pj-bg: #04060c;
+  --pj-panel: #0b1220;
+  --pj-panel-2: #0f172a;
+  --pj-edge: #1e293b;
+  --pj-line: #cbd5e1;
+  --pj-text: #ffffff;
+  --pj-muted: #a8b6c9;
+  --pj-muted-2: #94a3b8;
+  --pj-accent: #ffd60a;
+  --pj-accent-soft: rgba(255, 214, 10, 0.25);
+  --pj-score: #22d3ee;
+  --pj-live: #ef4444;
+  --pj-chip-bg: #0b1220;
+  --pj-chip-edge: #334155;
+  --pj-chip-text: #cbd5e1;
+  --pj-chip-active-bg: rgba(255, 214, 10, 0.13);
+  --pj-match-bg: #0f172a;
+  --pj-match-edge: #334155;
+  --pj-match-decided: #0d1526;
+  --pj-slot-tag-bg: #1f2937;
+  --pj-slot-tag-text: #9ca3af;
+  --pj-winner-bg: rgba(52, 211, 153, 0.16);
+  --pj-winner-edge: #34d399;
+  --pj-bye-bg: rgba(148, 163, 184, 0.08);
+  --pj-pair: #7dd3fc;
+  --pj-shadow: none;
+}
+
+/* 발표 모드에서는 페이지(바깥) 스크롤바 자체를 만들지 않는다 */
+.app.is-projector {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* .projector 는 화면 전체를 덮는 fixed 레이어이므로 스크롤바가 생기지 않는다.
+   (:has() 를 지원하는 브라우저에서는 body 스크롤도 함께 잠근다) */
+body:has(.app.is-projector),
+html:has(.app.is-projector) {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ---------- 상단 바 ---------- */
+
 .pj-top {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 1.1em;
+  gap: 0.8em;
   flex-wrap: wrap;
-  padding: 0.75em 1.1em;
-  border-bottom: 3px solid #1e293b;
+  padding: 0.6em 1.1em;
+  background: var(--pj-panel);
+  border-bottom: 3px solid var(--pj-edge);
 }
 
 .pj-brand {
   font-weight: 900;
-  font-size: 1.18em;
+  font-size: 1.12em;
   white-space: nowrap;
 }
 
 .pj-brand b {
-  color: #ffd60a;
+  color: var(--pj-accent);
 }
 
 .pj-chips {
   display: flex;
-  gap: 0.55em;
+  gap: 0.5em;
   flex-wrap: wrap;
   flex: 1;
+  min-width: 0;
 }
 
 .pj-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.5em;
-  padding: 0.48em 1em;
+  gap: 0.45em;
+  padding: 0.42em 0.9em;
   border-radius: 999px;
-  border: 3px solid #334155;
-  background: #0b1220;
-  color: #cbd5e1;
+  border: 3px solid var(--pj-chip-edge);
+  background: var(--pj-chip-bg);
+  color: var(--pj-chip-text);
   font-weight: 900;
-  font-size: 0.95em;
+  font-size: 0.9em;
   cursor: pointer;
 }
 
 .pj-chip .dot {
-  width: 0.55em;
-  height: 0.55em;
+  width: 0.5em;
+  height: 0.5em;
   border-radius: 50%;
-  background: #475569;
+  background: var(--pj-muted-2);
   flex: none;
 }
 
@@ -1606,53 +1727,86 @@ textarea {
 }
 
 .pj-chip:hover {
-  border-color: #64748b;
-  color: #ffffff;
+  border-color: var(--pj-muted-2);
+  color: var(--pj-text);
 }
 
 .pj-chip.active {
-  border-color: #ffd60a;
-  background: rgba(255, 214, 10, 0.13);
-  color: #ffffff;
+  border-color: var(--pj-accent);
+  background: var(--pj-chip-active-bg);
+  color: var(--pj-text);
+}
+
+.pj-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  margin-left: auto;
+}
+
+/* ☀️/🌙 테마 전환 — ✕ 종료 버튼 바로 옆 */
+.pj-theme {
+  border: 3px solid var(--pj-chip-edge);
+  background: var(--pj-chip-bg);
+  color: var(--pj-chip-text);
+  font-weight: 900;
+  font-size: 0.9em;
+  padding: 0.45em 0.85em;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pj-theme:hover {
+  border-color: var(--pj-accent);
+  color: var(--pj-accent);
 }
 
 .pj-exit {
-  border: 3px solid #334155;
-  background: #0b1220;
-  color: #94a3b8;
+  border: 3px solid var(--pj-chip-edge);
+  background: var(--pj-chip-bg);
+  color: var(--pj-muted);
   font-weight: 900;
-  font-size: 0.95em;
-  padding: 0.5em 1em;
+  font-size: 0.9em;
+  padding: 0.45em 0.9em;
   border-radius: 12px;
   cursor: pointer;
-  opacity: 0.55;
+  opacity: 0.7;
   white-space: nowrap;
 }
 
 .pj-exit:hover {
   opacity: 1;
-  color: #ffffff;
-  border-color: #64748b;
+  color: var(--pj-text);
+  border-color: var(--pj-muted-2);
 }
 
 .pj-exit small {
   font-size: 0.72em;
-  color: #64748b;
+  color: var(--pj-muted-2);
 }
+
+/* ---------- 본문 2열 (Now Playing | 대진표) ---------- */
 
 .pj-main {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1.12fr 1fr;
-  gap: 1.1em;
-  padding: 0.9em 1.1em 1em;
+  /* 두 열 모두 minmax(0, …) — 내용이 열 폭을 밀어내지 않게 해 겹침/가로 스크롤을 막는다 */
+  grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 1em;
+  padding: 0.85em 1.1em 1em;
+  overflow: hidden;
 }
 
 .pj-now-wrap {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  /* Now Playing 이름 크기는 이 컨테이너 폭(cqw) 기준으로 줄어든다 */
+  container-type: inline-size;
 }
 
 .now {
@@ -1660,158 +1814,256 @@ textarea {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #0b1220;
-  border: 4px solid #1e293b;
+  background: var(--pj-panel);
+  border: 4px solid var(--pj-edge);
   border-radius: 1.1em;
-  padding: 1.1em 1.3em;
+  padding: 0.85em 1.05em;
+  overflow: hidden;
+  box-shadow: var(--pj-shadow);
 }
 
 .now-head {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 0.9em;
+  gap: 0.8em;
   flex-wrap: wrap;
 }
 
 .now-round {
-  font-size: 1.75em;
+  font-size: 1.65em;
   font-weight: 900;
-  color: #ffd60a;
-  letter-spacing: 0.02em;
+  color: var(--pj-accent);
+  letter-spacing: 0.01em;
 }
 
 .now-live {
-  background: #ef4444;
+  background: var(--pj-live);
   color: #ffffff;
   font-weight: 900;
-  padding: 0.22em 0.75em;
+  padding: 0.2em 0.7em;
   border-radius: 999px;
-  font-size: 0.9em;
+  font-size: 0.86em;
   animation: pulse 1.4s infinite;
 }
 
 .now-sub {
   margin-left: auto;
-  color: #94a3b8;
+  color: var(--pj-muted);
   font-weight: 800;
-  font-size: 0.95em;
+  font-size: 0.9em;
 }
 
 .now-body {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.65em;
+  gap: 0.5em;
   align-items: stretch;
-  margin-top: 0.9em;
+  margin-top: 0.5em;
 }
 
 .now-side {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.4em;
-  padding: 0.9em 0.7em;
+  gap: 0.2em;
+  padding: 0.5em 0.7em;
   border-radius: 1em;
-  background: #0f172a;
+  background: var(--pj-panel-2);
   border: 4px solid transparent;
   text-align: center;
-  min-width: 0;
-  overflow: auto;
+  /* 이름/점수 영역 안쪽에 스크롤바가 생기지 않도록 항상 hidden */
+  overflow: hidden;
+}
+
+/*
+ * Now Playing 각 줄은 절대 찌그러지지 않게 고정 —
+ * flex 축소로 구성원/조합 줄이 0px 로 눌려 보이지 않던 문제 방지.
+ * (폭/높이에 맞춘 글자 크기는 .now-name 의 cqw·vh 상한이 담당한다)
+ */
+.now-side > * {
+  flex: none;
 }
 
 .now-side.winner {
-  border-color: #34d399;
-  background: rgba(52, 211, 153, 0.13);
+  border-color: var(--pj-winner-edge);
+  background: var(--pj-winner-bg);
 }
 
 .now-side.loser {
   opacity: 0.5;
 }
 
+/* 이름은 항상 한 줄 — 컨테이너 폭(cqw)과 화면 높이(vh)에 맞춰 폰트가 줄어든다 */
 .now-name {
-  font-size: clamp(2.1rem, 7.2vh, 5.4rem);
+  font-size: clamp(1.6rem, 4.05em, 7.6vh); /* cqw 미지원 브라우저 폴백 */
+  font-size: min(4.05em, 11.5cqw, 7.6vh);
   font-weight: 900;
-  line-height: 1.08;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  /* 폰트 자체의 줄 높이(≈1.14em)보다 크게 — 글자 위/아래가 잘리지 않는다 */
+  line-height: 1.18;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
   max-width: 100%;
+  min-width: 0;
+}
+
+.now-name.name-fit-2 {
+  font-size: clamp(1.4rem, 3em, 6vh);
+  font-size: min(3em, 8.6cqw, 6vh); /* 7~9글자 */
+}
+
+.now-name.name-fit-3 {
+  font-size: clamp(1.2rem, 2.3em, 4.8vh);
+  font-size: min(2.3em, 5.6cqw, 4.8vh); /* 10글자 이상 */
+}
+
+/* 3인 팀 경기 — 출전 조합/다음 조합/섞기 줄이 함께 들어가므로 한 단계 작게 */
+.now-with-pairs .now-name {
+  font-size: clamp(1.4rem, 3.4em, 6.2vh);
+  font-size: min(3.4em, 9.6cqw, 6.2vh);
+}
+
+.now-with-pairs .now-name.name-fit-2 {
+  font-size: clamp(1.2rem, 2.7em, 5.2vh);
+  font-size: min(2.7em, 7.8cqw, 5.4vh);
+}
+
+.now-with-pairs .now-name.name-fit-3 {
+  font-size: clamp(1.05rem, 2.1em, 4.2vh);
+  font-size: min(2.1em, 5.2cqw, 4.2vh);
+}
+
+.now-with-pairs .now-pair {
+  font-size: 0.84em;
+}
+
+.now-with-pairs .now-pair-next {
+  font-size: 0.6em;
 }
 
 .now-members {
-  font-size: 1.05em;
+  font-size: 0.92em;
   font-weight: 700;
-  color: #94a3b8;
-  min-height: 1.3em;
+  color: var(--pj-muted);
+  min-height: 1.16em;
   max-width: 100%;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .now-score {
-  font-size: clamp(1.05rem, 2.4vh, 1.8rem);
+  font-size: min(1.6em, 34px);
   font-weight: 900;
-  color: #22d3ee;
+  color: var(--pj-score);
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
+  line-height: 1.1;
 }
 
 /* 프로젝터 Now Playing — 3인 팀 현재/다음 출전 조합 */
 .now-pair {
-  font-size: 1em;
+  font-size: 0.88em;
   font-weight: 900;
-  color: #fde047;
+  color: var(--pj-pair);
+  line-height: 1.25;
   max-width: 100%;
-  overflow-wrap: anywhere;
-  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .now-pair-next {
-  font-size: 0.74em;
+  font-size: 0.64em;
   font-weight: 800;
-  color: #94a3b8;
+  color: var(--pj-muted);
+  line-height: 1.25;
   max-width: 100%;
-  overflow-wrap: anywhere;
-  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .now-side.winner .now-score {
-  color: #34d399;
+  color: var(--pj-winner-edge);
 }
 
 .now-flag {
-  color: #ffd60a;
+  color: var(--pj-accent);
   font-weight: 900;
-  font-size: 1.05em;
+  font-size: 1em;
 }
 
 .now-vs {
   flex: none;
   align-self: center;
-  font-size: 1.9em;
+  font-size: 1.7em;
   font-weight: 900;
-  color: #334155;
+  color: var(--pj-muted-2);
 }
 
-.pj-nav {
+/* 🔀 3인 팀 출전 조합 순서 랜덤 섞기 (Now Playing 하단) */
+.now-shuffle {
+  flex: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1em;
-  margin-top: 0.9em;
+  gap: 0.45em;
+  flex-wrap: wrap;
+  margin-top: 0.4em;
+  padding-top: 0.35em;
+  border-top: 2px dashed var(--pj-chip-edge);
+}
+
+.pj-shuffle {
+  border: 3px solid var(--pj-chip-edge);
+  background: var(--pj-panel-2);
+  color: var(--pj-text);
+  font-weight: 900;
+  font-size: 0.84em;
+  padding: 0.32em 0.8em;
+  border-radius: 0.7em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pj-shuffle:hover {
+  border-color: var(--pj-accent);
+  color: var(--pj-accent);
+}
+
+.pj-shuffle-note {
+  font-size: 0.66em;
+  font-weight: 700;
+  color: var(--pj-muted-2);
+  line-height: 1.3;
+}
+
+/* ---------- 하단 네비게이션 ---------- */
+
+.pj-nav {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  flex-wrap: wrap;
+  margin-top: 0.55em;
 }
 
 .pj-nav button {
-  font-size: 1.08em;
+  font-size: 1em;
   font-weight: 900;
-  padding: 0.55em 1.2em;
+  padding: 0.45em 1em;
   border-radius: 0.8em;
-  border: 3px solid #334155;
-  background: #0b1220;
-  color: #e2e8f0;
+  border: 3px solid var(--pj-chip-edge);
+  background: var(--pj-panel);
+  color: var(--pj-text);
   cursor: pointer;
 }
 
@@ -1821,62 +2073,86 @@ textarea {
 }
 
 .pj-nav button:not(:disabled):hover {
-  border-color: #ffd60a;
-  color: #ffd60a;
+  border-color: var(--pj-accent);
+  color: var(--pj-accent);
 }
 
 .pj-nav-idx {
-  color: #64748b;
+  margin-right: auto;
+  color: var(--pj-muted-2);
   font-weight: 900;
 }
+
+/* ---------- 대진표 패널 ---------- */
 
 .pj-bracket-wrap {
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  background: #0b1220;
-  border: 4px solid #1e293b;
+  background: var(--pj-panel);
+  border: 4px solid var(--pj-edge);
   border-radius: 1.1em;
-  padding: 0.9em 1.1em;
+  padding: 0.75em 0.85em;
+  overflow: hidden;
+  box-shadow: var(--pj-shadow);
 }
 
 .pj-bracket-title {
+  flex: none;
   font-weight: 900;
-  font-size: 1.2em;
-  color: #e2e8f0;
+  font-size: 1.12em;
+  color: var(--pj-text);
   margin-bottom: 0.3em;
 }
 
 .pj-bracket-title small {
-  color: #64748b;
+  color: var(--pj-muted-2);
   font-weight: 700;
 }
 
+/* 세로/가로 스크롤은 이 안쪽에서만 — 페이지 전체 스크롤바를 만들지 않는다 */
 .pj-bracket-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
-/* 프로젝트터 모드용 브래킷 오버라이드 (굵은 선 · 큰 글씨) */
+/* 프로젝터 대진표 오버라이드 — 라운드 헤더/카드가 서로 겹치지 않는 크기로 고정 */
 .projector .bracket {
-  --gap-x: 44px;
-  --row-h: max(98px, 7.6vh);
-  --col-w: max(245px, 15vw);
-  padding: 36px 6px 12px;
+  --gap-x: 24px;
+  --row-h: 148px;
+  --col-w: 238px;
+  --head-h: 52px;
+  gap: var(--gap-x);
+  padding: 12px 0.2em 0.6em;
+  overflow: visible;
+}
+
+.projector .br-col {
+  /* 라운드 헤더 글자 크기를 열 폭(cqw)에 맞춘다 */
+  container-type: inline-size;
 }
 
 .projector .br-round {
-  color: #e2e8f0;
-  font-size: 1.05em;
+  color: var(--pj-text);
+  font-size: min(1em, 24px);
+  font-size: min(1em, 9cqw); /* "준결승 (4강)" 처럼 긴 라운드명도 열 안에 들어오게 */
+  line-height: 1.25;
+  gap: 1px;
+  white-space: nowrap;
 }
 
 .projector .br-round small {
-  color: #64748b;
+  color: var(--pj-muted-2);
+  font-size: min(0.72em, 18px);
+  font-size: min(0.72em, 6.4cqw);
+  white-space: nowrap;
 }
 
 .projector .conn {
-  background: #cbd5e1;
+  background: var(--pj-line);
 }
 
 .projector .conn.r,
@@ -1890,62 +2166,89 @@ textarea {
 }
 
 .projector .match {
-  background: #0f172a;
-  border: 4px solid #334155;
-  border-radius: 0.75em;
+  background: var(--pj-match-bg);
+  border: 4px solid var(--pj-match-edge);
+  border-radius: 0.7em;
+  padding: 0.45em 0.55em;
+  gap: 0.18em;
+  box-shadow: var(--pj-shadow);
 }
 
 .projector .match:hover {
-  border-color: #475569;
+  border-color: var(--pj-muted-2);
 }
 
 .projector .match.current {
-  border-color: #ffd60a;
-  box-shadow: 0 0 0 0.22em rgba(255, 214, 10, 0.25);
+  border-color: var(--pj-accent);
+  box-shadow: 0 0 0 0.16em var(--pj-accent-soft);
 }
 
 .projector .match.decided {
-  background: #0d1526;
+  background: var(--pj-match-decided);
 }
 
 .projector .slot {
-  padding: 0.32em 0.2em;
+  padding: 0.16em 0.15em;
+  gap: 0.4em;
 }
 
 .projector .slot-tag {
-  background: #1f2937;
-  color: #9ca3af;
-  font-size: 0.8em;
-  width: 1.55em;
-  height: 1.55em;
+  background: var(--pj-slot-tag-bg);
+  color: var(--pj-slot-tag-text);
+  font-size: min(0.78em, 20px);
+  width: 1.6em;
+  height: 1.6em;
+  min-width: 26px;
+  min-height: 26px;
+  border-radius: 0.4em;
 }
 
 .projector .slot-name {
-  color: #ffffff;
-  font-size: 1.08em;
+  gap: 0.4em;
+  font-size: min(1em, 26px);
+  line-height: 1.2;
 }
 
 .projector .slot-members {
-  color: #94a3b8;
-  font-size: 0.72em;
+  color: var(--pj-muted);
+  font-size: min(0.68em, 18px);
+}
+
+/* 3인 팀 슬롯: 이름 한 줄 + 현재 출전 조합 한 줄 (구성원은 편집 보드/Now Playing에서 확인) */
+.projector .slot-name.wrap {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.projector .slot-name.wrap .slot-members {
+  display: none;
 }
 
 .projector .slot-pair-now {
-  color: #7dd3fc;
+  display: block;
+  max-width: 100%;
+  font-size: min(0.66em, 18px);
+  color: var(--pj-pair);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .projector .slot-score {
-  color: #22d3ee;
-  font-size: 1.05em;
+  color: var(--pj-score);
+  font-size: min(1em, 26px);
   min-width: 0;
 }
 
 .projector .slot.winner {
-  background: rgba(52, 211, 153, 0.16);
+  background: var(--pj-winner-bg);
 }
 
 .projector .slot.winner .slot-tag {
-  background: #059669;
+  background: var(--pj-winner-edge);
   color: #ffffff;
 }
 
@@ -1955,14 +2258,15 @@ textarea {
 
 .projector .slot.tbd .slot-name,
 .projector .slot.bye .slot-name {
-  color: #64748b;
+  color: var(--pj-muted-2);
 }
 
 .projector .slot.bye {
-  background: rgba(148, 163, 184, 0.08);
+  background: var(--pj-bye-bg);
 }
 
-/* 대기 화면 */
+/* ---------- 대기 화면 ---------- */
+
 .pj-waiting {
   display: flex;
   flex-direction: column;
@@ -1971,30 +2275,31 @@ textarea {
   gap: 0.7em;
   flex: 1;
   min-height: 0;
-  color: #e2e8f0;
+  color: var(--pj-text);
   text-align: center;
   padding: 2em;
 }
 
 .pj-waiting-icon {
-  font-size: 3.6em;
+  font-size: 3.4em;
   line-height: 1;
 }
 
 .pj-waiting strong {
-  font-size: 2.1em;
+  font-size: 2em;
   font-weight: 900;
 }
 
 .pj-waiting small {
-  color: #94a3b8;
+  color: var(--pj-muted);
   font-weight: 700;
-  font-size: 1.05em;
+  font-size: 1em;
   max-width: 36em;
   line-height: 1.7;
 }
 
-/* 프로젝터 최종 결과(포디움) */
+/* ---------- 프로젝터 최종 결과(포디움) ---------- */
+
 .pj-podium-wrap {
   flex: 1;
   min-height: 0;
@@ -2002,71 +2307,75 @@ textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.5em;
+  gap: 1.3em;
   padding: 1em;
   overflow: auto;
 }
 
 .pj-podium-title {
-  font-size: 2.1em;
+  font-size: 2em;
   font-weight: 900;
-  color: #ffd60a;
+  color: var(--pj-accent);
   text-align: center;
 }
 
 .pj-podium {
-  width: min(86vw, 900px);
+  width: min(90vw, 1000px);
 }
 
 .pj-podium .podium-card {
-  background: #0f172a;
-  border-width: 5px;
-  padding: 1.3em 1em;
+  background: var(--pj-panel);
+  border-color: var(--pj-chip-edge);
+  box-shadow: var(--pj-shadow);
+  padding: 1.2em 0.9em;
 }
 
 .pj-podium .podium-card.rank-1 {
   border-color: #f59e0b;
-  background: rgba(245, 158, 11, 0.14);
+  background: var(--pj-panel);
 }
 
 .pj-podium .podium-card.rank-2 {
-  border-color: #94a3b8;
+  border-color: var(--pj-muted-2);
 }
 
 .pj-podium .podium-card.rank-3 {
   border-color: #d97706;
-  background: rgba(217, 119, 6, 0.12);
+  background: var(--pj-panel);
 }
 
 .pj-podium .podium-medal {
-  font-size: 3.6em;
+  font-size: 3.4em;
 }
 
 .pj-podium .podium-label {
-  color: #94a3b8;
-  font-size: 1.05em;
+  color: var(--pj-muted);
+  font-size: 1em;
 }
 
 .pj-podium .podium-name {
-  color: #ffffff;
-  font-size: 2em;
+  color: var(--pj-text);
+  font-size: 1.9em;
 }
 
 .pj-hint {
-  color: #64748b;
+  color: var(--pj-muted-2);
   font-weight: 700;
-  font-size: 0.98em;
+  font-size: 0.95em;
+  text-align: center;
 }
 
 /* ================= 반응형 ================= */
 
+/* ---------- 태블릿 / 좁은 데스크톱 ---------- */
+
 @media (max-width: 1080px) {
   .part-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .builder-cols {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .header {
@@ -2083,9 +2392,293 @@ textarea {
     padding: 16px 14px 60px;
   }
 
+  /* 편집 대진표: 3인 팀 카드(조합 줄 포함)도 겹치지 않는 행 높이 */
+  .bracket {
+    --gap-x: 40px;
+    --row-h: 176px;
+    --col-w: 278px;
+    padding: 10px 6px 16px;
+  }
+}
+
+/*
+ * 프로젝터: 세로 화면(모바일/태블릿 세로)에서는 위아래로 쌓는다.
+ * 가로 화면은 1024×768(4:3 빔프로젝터)에서도 2열 유지 —
+ * 이름이 열 폭에 맞춰 축소되므로 Now Playing 패널이 찌그러지지 않는다.
+ */
+@media (orientation: portrait), (max-width: 900px) {
   .pj-main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    gap: 0.7em;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 쌓인 레이아웃에서는 패널이 내용 높이만큼 자라 안쪽 스크롤바가 생기지 않는다 */
+  .now,
+  .now-body,
+  .now-side {
+    flex: none;
+  }
+
+  .now-body {
+    gap: 0.5em;
+  }
+
+  .pj-bracket-wrap {
+    min-height: 0;
+  }
+
+  .pj-bracket-scroll {
+    max-height: 54vh;
+  }
+
+  .pj-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .pj-chips::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ---------- 모바일 ---------- */
+
+@media (max-width: 720px) {
+  .header {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .header-titles h1 {
+    font-size: 1.05rem;
+  }
+
+  .header-titles p {
+    display: none;
+  }
+
+  .header-logo {
+    font-size: 1.7rem;
+  }
+
+  .steps {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    padding: 3px;
+  }
+
+  .step {
+    font-size: 0.85rem;
+    padding: 8px 12px;
+  }
+
+  .header-right {
+    margin-left: 0;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .header-right .chip {
+    font-size: 0.78rem;
+    padding: 6px 11px;
+  }
+
+  .proj-btn {
+    flex: 1;
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 0.95rem;
+    box-shadow: 3px 3px 0 #0f172a;
+  }
+
+  .main {
+    padding: 12px 10px 60px;
+  }
+
+  .panel {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .part-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .save-note {
+    text-align: center;
+  }
+
+  .event-chips {
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .event-chip {
+    padding: 9px 13px;
+    font-size: 0.85rem;
+    border-width: 2px;
+  }
+
+  .event-title h2 {
+    font-size: 1.2rem;
+  }
+
+  .event-tools {
+    width: 100%;
+  }
+
+  .seg {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .seg-btn {
+    flex: 1;
+    font-size: 0.85rem;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+  .builder-pair {
+    width: 100%;
+  }
+
+  .builder-pair .btn {
+    flex: 1 1 auto;
+  }
+
+  .chip-athlete {
+    padding: 8px 12px;
+    font-size: 0.88rem;
+  }
+
+  .team-card {
+    gap: 8px;
+  }
+
+  .team-slots {
+    flex-basis: 100%;
+    order: 4;
+    gap: 6px;
+  }
+
+  .team-name {
+    width: auto;
+    flex: 1;
+    order: 3;
+  }
+
+  .team-move {
+    flex-direction: row;
+    order: 3;
+  }
+
+  .team-pairings {
+    margin-left: 0;
+    order: 5;
+  }
+
+  .ind-list {
     grid-template-columns: 1fr;
-    grid-template-rows: 1.1fr 1fr;
-    overflow: auto;
+  }
+
+  /* 입력 요소의 고유 최소폭(input size / textarea cols) 때문에 가로 스크롤이 생기지 않도록 */
+  .input,
+  .textarea,
+  .team-name {
+    min-width: 0;
+  }
+
+  .add-row .input {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .roster-row {
+    gap: 6px;
+  }
+
+  .setup-card {
+    padding: 22px 18px;
+  }
+
+  /* 편집 대진표: 손가락으로 짚을 수 있는 크기 + 카드 겹침 방지 */
+  .bracket {
+    --gap-x: 26px;
+    --row-h: 184px;
+    --col-w: 244px;
+    --head-h: 40px;
+    padding: 8px 4px 14px;
+  }
+
+  .slot-name {
+    font-size: 0.95rem;
+  }
+
+  .slot-members {
+    font-size: 0.66rem;
+  }
+
+  .slot-pair-now {
+    font-size: 0.68rem;
+  }
+
+  .score-input {
+    width: 74px;
+  }
+
+  .board-status {
+    gap: 6px;
+  }
+
+  .board-status .chip {
+    font-size: 0.78rem;
+    padding: 6px 11px;
+  }
+
+  .shuffle-seed,
+  .board-status .btn {
+    width: 100%;
+  }
+
+  /* iOS에서 입력 시 화면이 확대되지 않도록 16px 유지 */
+  .input,
+  .textarea,
+  .roster-name,
+  .team-name,
+  .score-input {
+    font-size: 16px;
+  }
+
+  .modal {
+    padding: 18px;
+    border-radius: 14px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .modal-actions .btn {
+    width: 100%;
+  }
+
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .podium {
+    grid-template-columns: 1fr;
+  }
+
+  .podium-card.rank-1 {
+    order: -1;
   }
 }
