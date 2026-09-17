@@ -2,6 +2,7 @@
   "name": "tournament-manager",
   "private": true,
   "version": "2.0.0",
+  "license": "MIT",
   "description": "스포츠스태킹 대회 운영 시스템 — 6종목 프리셋, 더블 팀 빌더, 빔프로젝터 발표 모드",
   "type": "module",
   "scripts": {
