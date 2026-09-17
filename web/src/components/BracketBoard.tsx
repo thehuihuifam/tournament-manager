@@ -133,7 +133,7 @@ function Slot({
       <span className="slot-tag">{side}</span>
       {tid ? (
         <span className={cls('slot-name', pairNames && 'wrap')} title={memberNames ?? undefined}>
-          {team?.name ?? '—'}
+          <span className="slot-title">{team?.name ?? '—'}</span>
           {memberNames && <small className="slot-members">{memberNames}</small>}
           {pairNames && (
             <small className="slot-pair-now" title="이번 경기 출전 조합">
@@ -201,6 +201,12 @@ function MatchCell({
   };
   const piA = pairInfo('A');
   const piB = pairInfo('B');
+
+  // 3인 팀(출전 조합 보유)이 포함된 측 — 이 경기의 조합 순서를 랜덤으로 다시 섞을 수 있다.
+  // (2인 팀만 있는 경기에는 버튼을 표시하지 않는다)
+  const trioTeamIds = (['A', 'B'] as const)
+    .map((s) => (s === 'A' ? m.a : m.b))
+    .filter((tid): tid is string => !!tid && (map.get(tid)?.pairings?.length ?? 0) > 1);
 
   const onScore = (side: 'A' | 'B', v: number | null) => {
     // 기록은 승자 판정과 독립적으로 저장한다.
@@ -271,6 +277,19 @@ function MatchCell({
                 onClick={() => dispatch({ type: 'match/pairingNext', id: ev.id, matchId: m.id, side: 'B' })}
               >
                 🔄 B 조합
+              </button>
+            )}
+            {!m.decided && both && trioTeamIds.length > 0 && (
+              <button
+                className="btn tiny pair-shuffle"
+                title="3인 팀의 출전 조합 순서를 랜덤으로 다시 섞습니다 — 현재·다음 출전 조합 표시가 바뀌고, 점수·승자·진출 결과는 그대로 유지됩니다."
+                onClick={() =>
+                  trioTeamIds.forEach((teamId) =>
+                    dispatch({ type: 'team/shufflePairings', id: ev.id, teamId }),
+                  )
+                }
+              >
+                🔀 조합 순서 랜덤 섞기
               </button>
             )}
             {!m.decided && both && (piA || piB) && (

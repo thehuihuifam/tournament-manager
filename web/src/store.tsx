@@ -3,6 +3,7 @@ import {
   AppState,
   Athlete,
   Gender,
+  ProjectorTheme,
   ScoreMode,
   SeedMode,
   Step,
@@ -15,8 +16,14 @@ import {
   buildMatches,
   decideFromScores,
   propagate,
+  shufflePairings,
   withValidPairings,
 } from './bracket';
+import {
+  DEFAULT_PROJECTOR_THEME,
+  normalizeProjectorTheme,
+  toggleProjectorTheme,
+} from './theme';
 import { uid } from './format';
 
 const LS_KEY = 'stacking-tournament-v2';
@@ -29,6 +36,7 @@ export function defaultState(): AppState {
     activeEventId: PRESETS[0].id,
     step: 'participants',
     projector: false,
+    projectorTheme: DEFAULT_PROJECTOR_THEME,
   };
 }
 
@@ -65,6 +73,8 @@ function migrate(): AppState | null {
           activeEventId: typeof d.activeEventId === 'string' ? d.activeEventId : s.activeEventId,
           step: d.step === 'brackets' || d.step === 'results' ? d.step : 'participants',
           projector: false,
+          // 테마 필드가 없는 기존 저장 데이터는 라이트로 자연스럽게 이관된다.
+          projectorTheme: normalizeProjectorTheme(d.projectorTheme),
         };
       }
     }
@@ -104,12 +114,16 @@ export type Action =
   | { type: 'event/teams'; id: string; teams: Team[] }
   | { type: 'event/reset'; id: string }
   | { type: 'event/generate'; id: string }
+  | { type: 'event/reseedRandom'; id: string }
+  | { type: 'team/shufflePairings'; id: string; teamId: string }
   | { type: 'match/score'; id: string; matchId: string; side: 'A' | 'B'; value: number | null }
   | { type: 'match/setResult'; id: string; matchId: string; winner: 'A' | 'B' | null; clearScores?: boolean }
   | { type: 'match/pairingNext'; id: string; matchId: string; side: 'A' | 'B' }
   | { type: 'match/decide'; id: string; matchId: string }
   | { type: 'match/current'; id: string; matchId: string | null }
   | { type: 'ui/projector'; on: boolean }
+  | { type: 'ui/projectorTheme'; theme: ProjectorTheme }
+  | { type: 'ui/projectorThemeToggle' }
   | { type: 'ui/step'; step: Step }
   | { type: 'reset/all' };
 
@@ -127,11 +141,19 @@ function refreshCurrent(ev: TEvent): TEvent {
   return { ...ev, currentMatchId: valid ? valid.id : autoCurrentId(ev.matches) };
 }
 
-/** 더블 종목이면 팀 id → Team 맵 (3인 팀 출전 조합 순환 전파용). 개인전은 undefined */
+/** 팀 id → Team 맵 (3인 팀 출전 조합 순환 전파용). 개인전은 undefined */
 function teamLookup(state: AppState, ev: TEvent): Map<string, Team> | undefined {
   const kind = presetOf(ev.id).kind;
   if (kind !== 'double') return undefined;
   return teamMap(getTeams(state.athletes, ev, kind));
+}
+
+/** 대진표 생성 — 현재 종목의 유효 팀으로 브래킷을 (재)생성한다. 팀이 2개 미만이면 그대로 둔다. */
+function generateBracket(state: AppState, ev: TEvent, seedMode: SeedMode): TEvent {
+  const teams = getTeams(state.athletes, ev, presetOf(ev.id).kind);
+  if (teams.length < 2) return { ...ev, seedMode };
+  const matches = buildMatches(teams, seedMode);
+  return { ...ev, seedMode, matches, currentMatchId: autoCurrentId(matches) };
 }
 
 function setResult(
@@ -155,7 +177,7 @@ function setResult(
   return refreshCurrent({ ...ev, matches: propagate(matches, teams) });
 }
 
-function reducer(state: AppState, a: Action): AppState {
+export function reducer(state: AppState, a: Action): AppState {
   switch (a.type) {
     case 'athlete/add': {
       const name = a.name.trim();
@@ -219,12 +241,24 @@ function reducer(state: AppState, a: Action): AppState {
     case 'event/reset':
       return withEvent(state, a.id, (ev) => ({ ...ev, matches: null, currentMatchId: null }));
     case 'event/generate':
-      return withEvent(state, a.id, (ev) => {
-        const teams = getTeams(state.athletes, ev, presetOf(ev.id).kind);
-        if (teams.length < 2) return ev;
-        const matches = buildMatches(teams, ev.seedMode);
-        return { ...ev, matches, currentMatchId: autoCurrentId(matches) };
-      });
+      return withEvent(state, a.id, (ev) => generateBracket(state, ev, ev.seedMode));
+    case 'event/reseedRandom':
+      // 🎲 대진 무작위 재배치 — 시드 모드를 random으로 바꾸고 대진표를 새로 만든다.
+      // (진행/결과는 사라지며, 호출부에서 확인 다이얼로그를 거친다)
+      return withEvent(state, a.id, (ev) => generateBracket(state, ev, 'random'));
+    case 'team/shufflePairings':
+      // 🔀 3인 팀의 출전 조합 순서만 무작위로 다시 섞는다 (조합 집합 AB·BC·AC는 그대로).
+      // 상태는 팀 데이터에만 저장되므로 불러올 때마다 렌더 결과가 동일하다.
+      return withEvent(state, a.id, (ev) => ({
+        ...ev,
+        teams: ev.teams
+          .map((t) =>
+            t.id === a.teamId && t.pairings && t.pairings.length > 1
+              ? { ...t, pairings: shufflePairings(t.pairings) }
+              : t,
+          )
+          .map(withValidPairings),
+      }));
     case 'match/score':
       return withEvent(state, a.id, (ev) => {
         if (!ev.matches) return ev;
@@ -269,6 +303,10 @@ function reducer(state: AppState, a: Action): AppState {
       return withEvent(state, a.id, (ev) => ({ ...ev, currentMatchId: a.matchId }));
     case 'ui/projector':
       return { ...state, projector: a.on };
+    case 'ui/projectorTheme':
+      return { ...state, projectorTheme: normalizeProjectorTheme(a.theme) };
+    case 'ui/projectorThemeToggle':
+      return { ...state, projectorTheme: toggleProjectorTheme(state.projectorTheme) };
     case 'ui/step':
       return { ...state, step: a.step };
     case 'reset/all':

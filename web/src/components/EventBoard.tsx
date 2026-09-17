@@ -221,6 +221,22 @@ export function EventBoard() {
                 {ev.scoreMode === 'time' ? '⏱ 짧은 기록 승리' : '🎯 세트 승패'} ·{' '}
                 {ev.seedMode === 'order' ? '시드 배치' : '무작위 배치'}
               </span>
+              <button
+                className="btn shuffle-seed"
+                title="대진표를 무작위로 다시 섞습니다 — 부전승(BYE)은 매치마다 하나씩 균등하게 분산되고, 진행 중인 경기 기록은 사라집니다."
+                onClick={() =>
+                  askConfirm({
+                    title: '대진 무작위 재배치',
+                    message:
+                      '대진표를 무작위로 다시 섞습니다. 지금까지 진행한 경기의 기록·승자·진출 결과가 모두 사라지고, 무작위 배치로 새 대진표가 만들어집니다. 계속할까요?',
+                    danger: true,
+                    confirmLabel: '🎲 다시 섞기',
+                    onConfirm: () => dispatch({ type: 'event/reseedRandom', id: ev.id }),
+                  })
+                }
+              >
+                🎲 대진 무작위로 다시 섞기
+              </button>
             </div>
             <BracketBoard ev={ev} mode="edit" />
             <p className="hint">

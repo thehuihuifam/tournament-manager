@@ -38,6 +38,9 @@ export interface Team {
 export type ScoreMode = 'time' | 'sets';
 export type SeedMode = 'order' | 'random';
 
+/** 프로젝터 발표 모드 테마 — 기본은 밝은 라이트(체육관 조명/저휘도 빔프로젝터에서 가독성 우선) */
+export type ProjectorTheme = 'light' | 'dark';
+
 export interface Match {
   id: string;
   round: number; // 0부터
@@ -73,5 +76,8 @@ export interface AppState {
   events: TEvent[];
   activeEventId: string;
   step: Step;
+  /** 발표 모드 진입 여부 (세션 전용 — 저장하지 않음) */
   projector: boolean;
+  /** 발표 모드 테마 (저장됨 · 기존 저장 데이터에 없으면 라이트로 복구) */
+  projectorTheme: ProjectorTheme;
 }
