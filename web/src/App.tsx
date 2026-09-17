@@ -9,7 +9,7 @@ import { ProjectorView } from './components/ProjectorView';
 import { cls } from './format';
 
 function Shell() {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, saveError } = useStore();
   const projectorRef = useRef(state.projector);
   projectorRef.current = state.projector;
 
@@ -45,6 +45,11 @@ function Shell() {
 
   return (
     <div className={cls('app', state.projector && 'is-projector')}>
+      {saveError && !state.projector && (
+        <div role="alert" style={{ background: '#ffdddd', color: '#a00', padding: '8px 12px', fontWeight: 'bold' }}>
+          저장 공간이 부족합니다. JSON 백업을 즉시 내보내세요.
+        </div>
+      )}
       {state.projector ? (
         <ProjectorView />
       ) : (

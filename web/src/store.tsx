@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import {
   AppState,
   Athlete,
@@ -317,12 +317,14 @@ export function reducer(state: AppState, a: Action): AppState {
 interface Ctx {
   state: AppState;
   dispatch: React.Dispatch<Action>;
+  saveError: boolean;
 }
 
 const StoreCtx = createContext<Ctx | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, () => migrate() ?? defaultState());
+  const [saveError, setSaveError] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -333,14 +335,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const { projector, ...persist } = stateRef.current;
         void projector;
         localStorage.setItem(LS_KEY, JSON.stringify(persist));
+        setSaveError(false);
       } catch {
-        /* 저장 실패 무시 */
+        setSaveError(true);
       }
     }, 200);
     return () => clearTimeout(t);
   }, [state]);
 
-  return <StoreCtx.Provider value={{ state, dispatch }}>{children}</StoreCtx.Provider>;
+  return <StoreCtx.Provider value={{ state, dispatch, saveError }}>{children}</StoreCtx.Provider>;
 }
 
 export function useStore(): Ctx {
