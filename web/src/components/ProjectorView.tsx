@@ -22,6 +22,8 @@ function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string,
       : null;
   const scoreText = (s: number | null, mode: ScoreMode) =>
     s == null ? null : mode === 'time' ? formatTime(s) : `${s} 세트`;
+  const scoreA = scoreText(cur.scoreA, ev.scoreMode);
+  const scoreB = scoreText(cur.scoreB, ev.scoreMode);
 
   return (
     <div className="now">
@@ -36,7 +38,7 @@ function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string,
         <div className={cls('now-side', cur.winner === 'A' && 'winner', cur.winner === 'B' && 'loser')}>
           <div className="now-name">{sideName(a)}</div>
           <div className="now-members">{membersOf(a) ?? '\u00A0'}</div>
-          <div className="now-score">{scoreText(cur.scoreA, ev.scoreMode) ?? '—'}</div>
+          {scoreA && <div className="now-score">{scoreA}</div>}
           {cur.winner === 'A' && <div className="now-flag">🏆 승</div>}
         </div>
         <div className="now-vs" aria-hidden>
@@ -45,7 +47,7 @@ function NowPlaying({ ev, cur, map }: { ev: TEvent; cur: Match; map: Map<string,
         <div className={cls('now-side', cur.winner === 'B' && 'winner', cur.winner === 'A' && 'loser')}>
           <div className="now-name">{sideName(b)}</div>
           <div className="now-members">{membersOf(b) ?? '\u00A0'}</div>
-          <div className="now-score">{scoreText(cur.scoreB, ev.scoreMode) ?? '—'}</div>
+          {scoreB && <div className="now-score">{scoreB}</div>}
           {cur.winner === 'B' && <div className="now-flag">🏆 승</div>}
         </div>
       </div>
