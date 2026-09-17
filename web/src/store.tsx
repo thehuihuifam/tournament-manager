@@ -125,6 +125,7 @@ export type Action =
   | { type: 'ui/projectorTheme'; theme: ProjectorTheme }
   | { type: 'ui/projectorThemeToggle' }
   | { type: 'ui/step'; step: Step }
+  | { type: 'backup/import'; data: AppState }
   | { type: 'reset/all' };
 
 function renumber(list: Athlete[], start = 1): Athlete[] {
@@ -309,9 +310,45 @@ export function reducer(state: AppState, a: Action): AppState {
       return { ...state, projectorTheme: toggleProjectorTheme(state.projectorTheme) };
     case 'ui/step':
       return { ...state, step: a.step };
+    case 'backup/import': {
+      // 가져온 데이터는 projector를 끄고 테마를 정규화해서 반영한다.
+      return {
+        ...a.data,
+        projector: false,
+        projectorTheme: normalizeProjectorTheme(a.data.projectorTheme),
+      };
+    }
     case 'reset/all':
       return defaultState();
   }
+}
+
+/** 백업 파일(JSON)을 파싱해 migrate + normalizeEvents 를 거친 AppState 로 정제한다. */
+export function restoreFromJSON(raw: string): AppState | null {
+  try {
+    const d = JSON.parse(raw) as Partial<AppState>;
+    if (!d || typeof d !== 'object' || !Array.isArray(d.athletes)) return null;
+    const s = defaultState();
+    const restored: AppState = {
+      ...s,
+      athletes: d.athletes,
+      events: normalizeEvents(d.events),
+      activeEventId: typeof d.activeEventId === 'string' ? d.activeEventId : s.activeEventId,
+      step: d.step === 'brackets' || d.step === 'results' ? d.step : 'participants',
+      projector: false,
+      projectorTheme: normalizeProjectorTheme(d.projectorTheme),
+    };
+    return restored;
+  } catch {
+    return null;
+  }
+}
+
+/** 내보내기용 JSON 문자열 (projector 필드 제외) */
+export function serializeState(state: AppState): string {
+  const { projector: _p, ...persist } = state;
+  void _p;
+  return JSON.stringify(persist, null, 2);
 }
 
 interface Ctx {
