@@ -26,3 +26,7 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      # PR 단계에서도 실제 프로덕션 빌드가 성공하는지 확인한다 (Vite 빌드 오류 조기 발견)
+      - name: Build
+        run: npm run build

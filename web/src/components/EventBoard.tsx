@@ -119,6 +119,21 @@ export function EventBoard() {
   const preset = presetOf(ev.id);
   const teams = getTeams(state.athletes, ev, preset.kind);
 
+  // 대진표가 만들어진 뒤 명단/팀 구성이 바뀌었는지 확인한다.
+  // (예: 개인전 대진을 만든 뒤 참가자를 추가하면 새 선수는 그 대진에 들어가지 않는다)
+  const bracketTeamIds = new Set<string>();
+  if (ev.matches) {
+    for (const m of ev.matches) {
+      if (m.round !== 0) continue;
+      if (m.a) bracketTeamIds.add(m.a);
+      if (m.b) bracketTeamIds.add(m.b);
+    }
+  }
+  const staleBracket =
+    ev.matches !== null &&
+    (teams.some((t) => !bracketTeamIds.has(t.id)) ||
+      [...bracketTeamIds].some((id) => !teams.some((t) => t.id === id)));
+
   return (
     <div className="event-board">
       <div className="event-chips" role="tablist" aria-label="종목 선택">
@@ -223,6 +238,26 @@ export function EventBoard() {
                 {ev.seedMode === 'order' ? '시드 배치' : '무작위 배치'}
               </span>
               <button
+                className="btn"
+                disabled={teams.length < 2}
+                title={
+                  teams.length < 2
+                    ? '팀이 2개 이상 있어야 대진표를 만들 수 있습니다'
+                    : '현재 명단·팀 구성으로 대진표를 다시 만듭니다 (같은 시드/무작위 배치 방식 유지). 진행 중인 결과는 사라집니다.'
+                }
+                onClick={() =>
+                  askConfirm({
+                    title: '대진표 다시 만들기',
+                    message: `현재 ${teams.length}개 팀 구성으로 대진표를 다시 만듭니다. 지금까지의 경기 기록·승자·진출 결과는 모두 사라집니다. 계속할까요?`,
+                    danger: true,
+                    confirmLabel: '대진표 다시 만들기',
+                    onConfirm: () => dispatch({ type: 'event/generate', id: ev.id }),
+                  })
+                }
+              >
+                ↻ 대진 다시 만들기
+              </button>
+              <button
                 className="btn shuffle-seed"
                 title="대진표를 무작위로 다시 섞습니다 — 부전승(BYE)은 매치마다 하나씩 균등하게 분산되고, 진행 중인 경기 기록은 사라집니다."
                 onClick={() =>
@@ -240,6 +275,11 @@ export function EventBoard() {
               </button>
             </div>
             <BracketBoard ev={ev} mode="edit" />
+            {staleBracket && (
+              <p className="hint warn" role="status">
+                ⚠️ 대진표를 만든 뒤 명단·팀 구성이 바뀌었습니다. 위의 <b>↻ 대진 다시 만들기</b>로 반영해 주세요.
+              </p>
+            )}
             <p className="hint">
               카드를 클릭하면 <b>현재 경기</b>로 지정되어 빔프로젝터 Now Playing에 표시됩니다. 이긴 팀 이름을 클릭하면 <b>승리</b> 처리되고, 점수는 <b>⏱ 기록 입력</b> 버튼에서 저장합니다.
             </p>

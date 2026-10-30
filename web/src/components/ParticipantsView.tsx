@@ -96,16 +96,36 @@ export function ParticipantsView() {
         gender: g,
       });
     });
-    if (list.length > 0) {
-      const maxNo = state.athletes.reduce((mx, x) => Math.max(mx, x.no), 0);
-      dispatch({
-        type: 'athlete/import',
-        list: list.map((a, i) => ({ ...a, no: a.no > 0 ? 0 : maxNo + 1 + i })),
-        mode: bulkMode,
+    // 번호가 모두 적혀 있으면 번호 순으로, 아니면 붙여넣은 순서를 그대로 명단 순서로 쓴다.
+    // (참가번호 = 시드 순서이므로 입력한 번호 순서를 존중한다)
+    const allNumbered = list.length > 0 && list.every((a) => a.no > 0);
+    const ordered = allNumbered ? [...list].sort((x, y) => x.no - y.no) : list;
+
+    const submit = () => {
+      if (ordered.length > 0) {
+        // 실제 참가번호는 reducer가 명단 순서대로 1..n 으로 다시 매긴다.
+        dispatch({
+          type: 'athlete/import',
+          list: ordered.map((a) => ({ ...a, no: 0 })),
+          mode: bulkMode,
+        });
+      }
+      setReport({ added: ordered.length, skipped, defaulted, errors });
+      if (ordered.length > 0) setBulk('');
+    };
+
+    // 덮어쓰기는 기존 명단·팀 구성을 지우므로 확인을 받는다.
+    if (ordered.length > 0 && bulkMode === 'replace' && state.athletes.length > 0) {
+      askConfirm({
+        title: '명단 덮어쓰기',
+        message: `현재 명단 ${state.athletes.length}명을 붙여넣은 ${ordered.length}명으로 교체합니다. 새 명단에 없는 선수는 더블 팀 구성에서 빠지고, 그 선수가 포함된 대진표는 초기화됩니다.`,
+        danger: true,
+        confirmLabel: '명단 교체',
+        onConfirm: submit,
       });
+      return;
     }
-    setReport({ added: list.length, skipped, defaulted, errors });
-    if (list.length > 0) setBulk('');
+    submit();
   };
 
   const removeAthlete = (a: Athlete) => {

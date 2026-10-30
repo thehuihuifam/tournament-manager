@@ -10,7 +10,8 @@
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "test": "vitest run",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "sync:root": "npm run build && node scripts/sync-root.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

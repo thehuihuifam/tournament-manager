@@ -35,8 +35,18 @@ export function uid(prefix = 'id'): string {
 }
 
 const TEAM_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+/**
+ * 팀 자동 이름 — A팀, B팀 … Z팀, AA팀, AB팀 …
+ * 26팀을 넘어도 이름이 겹치지 않는다 (대회 규모가 큰 경우 27번째 팀부터 'A팀'이 중복되던 문제 수정).
+ */
 export function teamAutoName(i: number): string {
-  return `${TEAM_LETTERS[i % 26]}팀`;
+  let n = Math.max(0, Math.floor(i));
+  let label = '';
+  do {
+    label = TEAM_LETTERS[n % 26] + label;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return `${label}팀`;
 }
 
 export function cls(...parts: (string | false | null | undefined)[]): string {

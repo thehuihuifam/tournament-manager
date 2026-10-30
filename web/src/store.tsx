@@ -3,6 +3,7 @@ import {
   AppState,
   Athlete,
   Gender,
+  Match,
   ProjectorTheme,
   ScoreMode,
   SeedMode,
@@ -40,6 +41,60 @@ export function defaultState(): AppState {
   };
 }
 
+/**
+ * 저장값/백업 파일의 참가자 배열을 안전하게 복구한다.
+ * - 이름이 없는 항목은 버리고, id 중복은 새 id로 바꾼다.
+ * - 참가번호는 배열 순서대로 1..n 으로 다시 매긴다 (번호 = 시드 순서).
+ */
+export function sanitizeAthletes(raw: unknown): Athlete[] | null {
+  if (!Array.isArray(raw)) return null;
+  const seen = new Set<string>();
+  const items: { athlete: Athlete; savedNo: number }[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const src = item as Partial<Athlete>;
+    const name = typeof src.name === 'string' ? src.name.trim() : '';
+    if (!name) continue;
+    let id = typeof src.id === 'string' && src.id ? src.id : uid('a');
+    if (seen.has(id)) id = uid('a');
+    seen.add(id);
+    items.push({
+      athlete: { id, no: 0, name, gender: src.gender === 'F' ? 'F' : 'M' },
+      // 저장된 참가번호(=시드 순서)를 존중한다. 번호가 없으면 배열 순서를 따른다.
+      savedNo: typeof src.no === 'number' && Number.isFinite(src.no) ? src.no : Number.MAX_SAFE_INTEGER,
+    });
+  }
+  items.sort((a, b) => a.savedNo - b.savedNo);
+  return items.map((x, i) => ({ ...x.athlete, no: i + 1 }));
+}
+
+/** 저장값/백업 파일의 대진 배열 검증 — 손상된 매치는 버린다 (앱 크래시 방지). */
+function normalizeMatches(raw: unknown): Match[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: Match[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const m = item as Partial<Match>;
+    if (typeof m.id !== 'string' || !m.id) continue;
+    if (typeof m.round !== 'number' || !Number.isFinite(m.round)) continue;
+    if (typeof m.index !== 'number' || !Number.isFinite(m.index)) continue;
+    out.push({
+      id: m.id,
+      round: m.round,
+      index: m.index,
+      a: typeof m.a === 'string' ? m.a : null,
+      b: typeof m.b === 'string' ? m.b : null,
+      scoreA: typeof m.scoreA === 'number' && Number.isFinite(m.scoreA) ? m.scoreA : null,
+      scoreB: typeof m.scoreB === 'number' && Number.isFinite(m.scoreB) ? m.scoreB : null,
+      winner: m.winner === 'A' || m.winner === 'B' ? m.winner : null,
+      decided: m.decided === true,
+      ...(typeof m.pairingA === 'number' ? { pairingA: m.pairingA } : {}),
+      ...(typeof m.pairingB === 'number' ? { pairingB: m.pairingB } : {}),
+    });
+  }
+  return out.length > 0 ? out : null;
+}
+
 function normalizeEvents(saved: unknown): TEvent[] {
   const base = initialEvents();
   if (!Array.isArray(saved)) return base;
@@ -49,11 +104,65 @@ function normalizeEvents(saved: unknown): TEvent[] {
     return {
       ...b,
       ...s,
+      scoreMode: s.scoreMode === 'sets' ? 'sets' : 'time',
+      seedMode: s.seedMode === 'random' ? 'random' : 'order',
       // 2인 구형 데이터에는 pairings가 없어도 그대로 복구되고,
       // 3인 팀의 저장된 pairings는 순서를 바꾸지 않고 그대로 복구한다.
-      teams: Array.isArray(s.teams) ? s.teams.map(withValidPairings) : [],
-      excludedIds: Array.isArray(s.excludedIds) ? s.excludedIds : [],
-      matches: Array.isArray(s.matches) ? s.matches : null,
+      teams: Array.isArray(s.teams)
+        ? s.teams
+            .filter((t): t is Team => !!t && typeof t === 'object' && typeof (t as Team).id === 'string')
+            .map(withValidPairings)
+        : [],
+      excludedIds: Array.isArray(s.excludedIds)
+        ? s.excludedIds.filter((id): id is string => typeof id === 'string')
+        : [],
+      matches: normalizeMatches(s.matches),
+      currentMatchId: typeof s.currentMatchId === 'string' ? s.currentMatchId : null,
+    };
+  });
+}
+
+/**
+ * 명단(참가자)과 종목 데이터의 정합성 복구.
+ * - 명단에서 사라진 선수를 팀 구성 · 불참 목록 · 대진 참조에서 제거한다.
+ * - 팀 구성이 실제로 바뀐 종목은 기존 대진표가 더 이상 유효하지 않으므로 초기화한다.
+ *   (그대로 두면 '??' 이름의 유령 팀이 브래킷에 남는다)
+ */
+export function reconcileEvents(athletes: Athlete[], events: TEvent[]): TEvent[] {
+  const ids = new Set(athletes.map((a) => a.id));
+  return events.map((ev) => {
+    const excludedIds = ev.excludedIds.filter((id) => ids.has(id));
+    const excludedChanged = excludedIds.length !== ev.excludedIds.length;
+
+    // 개인전 팀 id는 `ind-<선수 id>`로 명단에서 파생되므로 사라진 선수를 가리키는 대진표만 초기화한다.
+    if (presetOf(ev.id).kind === 'individual') {
+      const stale = !!ev.matches?.some((m) =>
+        [m.a, m.b].some((tid) => !!tid && tid.startsWith('ind-') && !ids.has(tid.slice(4))),
+      );
+      if (!stale && !excludedChanged) return ev;
+      return { ...ev, excludedIds, ...(stale ? { matches: null, currentMatchId: null } : {}) };
+    }
+
+    let teamsChanged = false;
+    const teams = ev.teams.reduce<Team[]>((acc, t) => {
+      const hadMembers = t.members.some(Boolean);
+      const members = t.members.filter((id) => !id || ids.has(id));
+      if (members.length !== t.members.length) teamsChanged = true;
+      if (hadMembers && !members.some(Boolean)) {
+        // 팀의 모든 선수가 명단에서 사라짐 → 팀 자체를 제거 (빈 슬롯만 있는 편집 중 팀은 유지)
+        teamsChanged = true;
+        return acc;
+      }
+      acc.push(members.length === t.members.length ? t : withValidPairings({ ...t, members }));
+      return acc;
+    }, []);
+
+    if (!teamsChanged && !excludedChanged) return ev;
+    return {
+      ...ev,
+      teams,
+      excludedIds,
+      ...(ev.matches ? { matches: null, currentMatchId: null } : {}),
     };
   });
 }
@@ -64,12 +173,13 @@ function migrate(): AppState | null {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) {
       const d = JSON.parse(raw) as Partial<AppState>;
-      if (Array.isArray(d.athletes)) {
+      const athletes = sanitizeAthletes(d.athletes);
+      if (athletes) {
         const s = defaultState();
         return {
           ...s,
-          athletes: d.athletes,
-          events: normalizeEvents(d.events),
+          athletes,
+          events: reconcileEvents(athletes, normalizeEvents(d.events)),
           activeEventId: typeof d.activeEventId === 'string' ? d.activeEventId : s.activeEventId,
           step: d.step === 'brackets' || d.step === 'results' ? d.step : 'participants',
           projector: false,
@@ -119,7 +229,6 @@ export type Action =
   | { type: 'match/score'; id: string; matchId: string; side: 'A' | 'B'; value: number | null }
   | { type: 'match/setResult'; id: string; matchId: string; winner: 'A' | 'B' | null; clearScores?: boolean }
   | { type: 'match/pairingNext'; id: string; matchId: string; side: 'A' | 'B' }
-  | { type: 'match/decide'; id: string; matchId: string }
   | { type: 'match/current'; id: string; matchId: string | null }
   | { type: 'ui/projector'; on: boolean }
   | { type: 'ui/projectorTheme'; theme: ProjectorTheme }
@@ -193,24 +302,22 @@ export function reducer(state: AppState, a: Action): AppState {
           x.id === a.id ? { ...x, name: a.name?.trim() || x.name, gender: a.gender ?? x.gender } : x,
         ),
       };
-    case 'athlete/remove':
-      return {
-        ...state,
-        athletes: state.athletes
-          .filter((x) => x.id !== a.id)
-          .map((x, i) => ({ ...x, no: i + 1 })),
-        events: state.events.map((ev) => {
-          // 선수가 빠진 팀은 pairings를 재정규화하고, 2명 미만으로 줄어든 팀은 제거한다.
-          const teams = ev.teams
-            .map((t) => withValidPairings({ ...t, members: t.members.filter((m) => m !== a.id) }))
-            .filter((t) => t.members.length === 2 || t.members.length === 3);
-          return { ...ev, teams };
-        }),
-      };
+    case 'athlete/remove': {
+      // 선수가 빠진 팀은 pairings를 재정규화하고, 팀 구성이 바뀐 종목의 대진표는 초기화한다.
+      const athletes = renumber(state.athletes.filter((x) => x.id !== a.id));
+      return { ...state, athletes, events: reconcileEvents(athletes, state.events) };
+    }
     case 'athlete/import': {
-      const base = a.mode === 'replace' ? [] : state.athletes;
-      const startNo = base.reduce((mx, x) => Math.max(mx, x.no), 0) + 1;
-      return { ...state, athletes: renumber([...base, ...a.list], startNo) };
+      // replace: 새 명단 1..n / append: 기존 번호를 그대로 두고 이어서 번호를 매긴다.
+      // (예전에는 append에서도 기존 참가자의 번호를 새로 매겨 시드 순서가 뒤바뀌었다)
+      const athletes =
+        a.mode === 'replace'
+          ? renumber(a.list, 1)
+          : [
+              ...state.athletes,
+              ...renumber(a.list, state.athletes.reduce((mx, x) => Math.max(mx, x.no), 0) + 1),
+            ];
+      return { ...state, athletes, events: reconcileEvents(athletes, state.events) };
     }
     case 'athlete/move': {
       const list = [...state.athletes];
@@ -268,7 +375,13 @@ export function reducer(state: AppState, a: Action): AppState {
             ? { ...m, [a.side === 'A' ? 'scoreA' : 'scoreB']: a.value }
             : m,
         );
-        return { ...ev, matches };
+        const target = matches.find((m) => m.id === a.matchId);
+        const nextEv: TEvent = { ...ev, matches };
+        // 양쪽 기록이 모두 입력되면 자동으로 승자를 판정한다 (짧은 기록/많은 세트 승리).
+        // 동률이거나 미결정 경기의 수동 승자 지정은 그대로 둔다.
+        if (!target || target.decided) return nextEv;
+        const w = decideFromScores(target, ev.scoreMode);
+        return w ? setResult(nextEv, a.matchId, w, false, teamLookup(state, ev)) : nextEv;
       });
     case 'match/setResult':
       return withEvent(state, a.id, (ev) =>
@@ -291,15 +404,6 @@ export function reducer(state: AppState, a: Action): AppState {
           ),
         };
       });
-    case 'match/decide': {
-      const ev = state.events.find((e) => e.id === a.id);
-      if (!ev?.matches) return state;
-      const m = ev.matches.find((x) => x.id === a.matchId);
-      if (!m) return state;
-      const w = decideFromScores(m, ev.scoreMode);
-      if (!w) return state;
-      return withEvent(state, a.id, (e) => setResult(e, a.matchId, w, false, teamLookup(state, e)));
-    }
     case 'match/current':
       return withEvent(state, a.id, (ev) => ({ ...ev, currentMatchId: a.matchId }));
     case 'ui/projector':
@@ -329,10 +433,12 @@ export function restoreFromJSON(raw: string): AppState | null {
     const d = JSON.parse(raw) as Partial<AppState>;
     if (!d || typeof d !== 'object' || !Array.isArray(d.athletes)) return null;
     const s = defaultState();
+    const athletes = sanitizeAthletes(d.athletes);
+    if (!athletes) return null;
     const restored: AppState = {
       ...s,
-      athletes: d.athletes,
-      events: normalizeEvents(d.events),
+      athletes,
+      events: reconcileEvents(athletes, normalizeEvents(d.events)),
       activeEventId: typeof d.activeEventId === 'string' ? d.activeEventId : s.activeEventId,
       step: d.step === 'brackets' || d.step === 'results' ? d.step : 'participants',
       projector: false,
@@ -379,6 +485,29 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }, 200);
     return () => clearTimeout(t);
   }, [state]);
+
+  // 탭을 닫거나 백그라운드로 보낼 때 마지막 입력까지 즉시 저장한다.
+  // (디바운스 200ms 사이에 창을 닫으면 마지막 조작이 사라질 수 있었다)
+  useEffect(() => {
+    const flush = () => {
+      try {
+        const { projector, ...persist } = stateRef.current;
+        void projector;
+        localStorage.setItem(LS_KEY, JSON.stringify(persist));
+      } catch {
+        /* 저장 실패는 다음 디바운스 저장에서 재시도된다 */
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
 
   return <StoreCtx.Provider value={{ state, dispatch, saveError }}>{children}</StoreCtx.Provider>;
 }

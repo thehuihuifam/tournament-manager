@@ -54,10 +54,12 @@ describe('helpers', () => {
     const id = uid('a');
     expect(id.startsWith('a-')).toBe(true);
   });
-  it('teamAutoName cycles A-Z', () => {
+  it('teamAutoName은 A-Z 이후 AA·AB로 이어져 이름이 겹치지 않는다', () => {
     expect(teamAutoName(0)).toBe('A팀');
     expect(teamAutoName(1)).toBe('B팀');
     expect(teamAutoName(25)).toBe('Z팀');
-    expect(teamAutoName(26)).toBe('A팀');
+    // 27번째 팀부터 'A팀'이 다시 나오면 서로 다른 팀이 같은 이름이 된다.
+    expect(teamAutoName(26)).toBe('AA팀');
+    expect(teamAutoName(27)).toBe('AB팀');
   });
 });

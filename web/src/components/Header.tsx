@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useStore } from '../store';
 import { cls } from '../format';
 import { restoreFromJSON, serializeState } from '../store';
+import { useConfirm } from '../uic';
 import { Step } from '../types';
 
 const STEPS: { id: Step; label: string }[] = [
@@ -23,6 +24,7 @@ function tsStamp(): string {
 
 export function Header() {
   const { state, dispatch } = useStore();
+  const { askConfirm } = useConfirm();
   const fileRef = useRef<HTMLInputElement>(null);
   const [banner, setBanner] = useState<Banner>(null);
   const m = state.athletes.filter((a) => a.gender === 'M').length;
@@ -68,12 +70,26 @@ export function Header() {
         });
         return;
       }
-      dispatch({ type: 'backup/import', data: restored });
-      const eventCount = restored.events.length;
-      setBanner({
-        kind: 'ok',
-        text: `✅ 백업 파일을 불러왔습니다. ${restored.athletes.length}명의 참가자와 ${eventCount}개 종목 데이터가 복원되었습니다.`,
-      });
+      const apply = () => {
+        dispatch({ type: 'backup/import', data: restored });
+        const eventCount = restored.events.length;
+        setBanner({
+          kind: 'ok',
+          text: `✅ 백업 파일을 불러왔습니다. ${restored.athletes.length}명의 참가자와 ${eventCount}개 종목 데이터가 복원되었습니다.`,
+        });
+      };
+      // 불러오기는 현재 대회 데이터를 통째로 덮어쓰므로 확인을 받는다.
+      if (state.athletes.length > 0 || state.events.some((ev) => ev.teams.length > 0 || ev.matches)) {
+        askConfirm({
+          title: '백업 파일 불러오기',
+          message: `현재 대회 데이터를 선택한 파일(${restored.athletes.length}명 · ${restored.events.length}개 종목) 내용으로 덮어씁니다. 지금까지의 명단·팀·대진·결과는 사라지며 되돌릴 수 없습니다. 계속할까요?`,
+          danger: true,
+          confirmLabel: '불러오기',
+          onConfirm: apply,
+        });
+      } else {
+        apply();
+      }
     };
     reader.onerror = () =>
       setBanner({

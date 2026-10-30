@@ -146,21 +146,34 @@ function advancingPairing(prev: Match | undefined, teams?: Map<string, Team>): n
 
 /**
  * 반응형 전파: 이전 라운드 승자로 다음 라운드 슬롯을 채우고,
- * 한쪽이 사라진(롤백된) 매치는 점수·결과를 초기화한다.
+ * 무효가 된(롤백된) 매치는 점수·결과를 초기화한다.
+ *
+ * 초기화 조건 (중요):
+ *  - 한쪽 슬롯이 비었다 (이전 라운드가 아직 안 끝났거나 롤백됨)
+ *  - **출전 팀이 바뀌었다** — 상위 라운드 승자가 바뀌면 이미 치른 하위 라운드 경기의
+ *    승자·점수는 다른 팀의 기록이므로 반드시 버려야 한다.
+ *    (예전에는 양쪽 슬롯이 모두 차 있으면 이 경우를 놓쳐, 실제로 치르지 않은
+ *     새 팀이 이전 승자의 결과로 결승을 통과하는 버그가 있었다)
+ *
  * teams(팀 id → Team)가 주어지면 3인 팀의 출전 조합 인덱스도 함께 순환 전파한다.
  */
 export function propagate(matches: Match[], teams?: Map<string, Team>): Match[] {
   const byRM = new Map<string, Match>();
   for (const m of matches) byRM.set(`${m.round}:${m.index}`, m);
-  for (const m of matches) {
+  // 라운드 오름차순으로 전파해야 같은 패스에서 하위 라운드까지 연쇄 롤백된다.
+  // (불러온 백업의 matches 순서가 뒤섞여 있어도 안전하도록 정렬해 순회한다)
+  const ordered = [...matches].sort((x, y) => x.round - y.round || x.index - y.index);
+  for (const m of ordered) {
     if (m.round === 0) continue;
     const la = byRM.get(`${m.round - 1}:${m.index * 2}`);
     const lb = byRM.get(`${m.round - 1}:${m.index * 2 + 1}`);
+    const prevA = m.a;
+    const prevB = m.b;
     m.a = la && la.winner ? (la.winner === 'A' ? la.a : la.b) : null;
     m.b = lb && lb.winner ? (lb.winner === 'A' ? lb.a : lb.b) : null;
     m.pairingA = advancingPairing(la, teams);
     m.pairingB = advancingPairing(lb, teams);
-    if (!m.a || !m.b) {
+    if (!m.a || !m.b || prevA !== m.a || prevB !== m.b) {
       m.winner = null;
       m.decided = false;
       m.scoreA = null;
@@ -183,10 +196,16 @@ export function decideFromScores(m: Match, mode: ScoreMode): 'A' | 'B' | null {
   return null;
 }
 
-/** 아직 미결정이고 양쪽 출전 팀이 있는 첫 매치 (라운드 순) */
+/** 아직 미결정이고 양쪽 출전 팀이 있는 첫 매치 (라운드·순번 순) */
 export function autoCurrentId(matches: Match[]): string | null {
-  for (const m of matches) if (!m.decided && m.a && m.b) return m.id;
-  return null;
+  let found: Match | null = null;
+  for (const m of matches) {
+    if (m.decided || !m.a || !m.b) continue;
+    if (!found || m.round < found.round || (m.round === found.round && m.index < found.index)) {
+      found = m;
+    }
+  }
+  return found ? found.id : null;
 }
 
 export function effectiveCurrentId(ev: { matches: Match[] | null; currentMatchId: string | null }): string | null {

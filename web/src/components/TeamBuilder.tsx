@@ -59,16 +59,24 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
   };
 
   const autoPairAll = (mode: PairMode) => {
-    const src = athletes
-      .filter((a) => filter === 'all' || a.gender === filter)
-      .sort((x, y) => x.no - y.no);
+    const genderPool = athletes.filter((a) => filter === 'all' || a.gender === filter);
+    const poolIds = new Set(genderPool.map((a) => a.id));
+    // 성별 필터를 쓰는 경우, 필터 밖 선수가 섞인 기존 팀은 건드리지 않는다.
+    // (예전에는 '남자' 필터로 자동 페어링하면 이미 만들어 둔 여자 팀이 모두 사라졌다)
+    const kept = filter === 'all' ? [] : ev.teams.filter((t) => t.members.some((m) => m && !poolIds.has(m)));
+    const keptIds = new Set(kept.flatMap((t) => t.members));
+    const src = genderPool.filter((a) => !keptIds.has(a.id)).sort((x, y) => x.no - y.no);
     if (src.length < 2) {
-      setNotice('페어링할 선수가 2명 미만입니다.');
+      setNotice(
+        kept.length > 0
+          ? `페어링할 선수가 2명 미만입니다. (필터 밖 선수로 만든 팀 ${kept.length}개는 그대로 유지됩니다)`
+          : '페어링할 선수가 2명 미만입니다.',
+      );
       return;
     }
     // 기존 동작(짝수 입력 → 2인 팀들)은 그대로 유지하고, 홀수 입력은 3인 팀으로 흡수한다.
     const { groups, leftover } = autoPairGroups(src, mode);
-    const next: Team[] = groups.map((g, i) => {
+    const formed: Team[] = groups.map((g, i) => {
       const existing = ev.teams.find(
         (t) => t.members.length === g.length && t.members.every((m) => g.includes(m)),
       );
@@ -77,17 +85,19 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
         const base = trioPairings(g);
         return {
           id: uid('t'),
-          name: teamAutoName(i),
+          name: teamAutoName(kept.length + i),
           members: [...g],
           size: 3,
           // 시드 순 모드(same)는 정규 순서, 무작위 모드(any·same-random)는 조합 순서도 랜덤 — 생성 시 한 번만 결정
           pairings: mode === 'same' ? base : shufflePairings(base),
         };
       }
-      return { id: uid('t'), name: teamAutoName(i), members: [...g] };
+      return { id: uid('t'), name: teamAutoName(kept.length + i), members: [...g] };
     });
+    const next: Team[] = filter === 'all' ? formed : [...kept, ...formed];
     setTeams(next);
-    const trioCount = next.filter((t) => t.members.length === 3).length;
+    const trioCount = formed.filter((t) => t.members.length === 3).length;
+    const keptNote = kept.length > 0 ? ` (필터 밖 선수 팀 ${kept.length}개는 유지)` : '';
     const leftoverNames = leftover.map(nameOf).join(', ');
     // 모드별 설명 — 완료 안내문 끝에 붙인다
     const modeNote =
@@ -101,7 +111,7 @@ export function TeamBuilder({ ev }: { ev: TEvent }) {
         ? `⚠️ ${leftover.length}명이 홀수로 남았습니다: ${leftoverNames} (빈 슬롯에 드래그/클릭으로 수동 추가하세요)`
         : `✅ ${
             trioCount > 0 ? `3명 팀 ${trioCount}개를 포함해 ` : ''
-          }총 ${next.length}개 팀 자동 구성 완료! 팀 순서가 시드 순서가 됩니다. ${modeNote}`,
+          }총 ${next.length}개 팀 자동 구성 완료!${keptNote} 팀 순서가 시드 순서가 됩니다. ${modeNote}`,
     );
   };
 
